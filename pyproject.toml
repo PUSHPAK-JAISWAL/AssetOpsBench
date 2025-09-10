@@ -11,17 +11,14 @@ requires-python = ">=3.12"
 dependencies = []
 
 [tool.hatch.build.targets.wheel]
-# Tell hatchling: all packages live under "src"
 sources = ["src"]
 
-# include everything (repo root + nested files)
 include = ["**"]
 
 exclude = [
   "benchmark/**",
   "metadata/**",
   "scenarios/**",
-
   ".git/**",
   ".venv/**",
   "venv/**",
