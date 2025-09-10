@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling>=1.10", "wheel"]
+build-backend = "hatchling.build"
+
+[project]
+name = "assetopsbench"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/assetopsbench"]
+
+# include everything by default (repo root + nested files)
+include = ["**"]
+
+# but exclude directories
+exclude = [
+  "benchmark/**",
+  "metadata/**",
+  "scenarios/**",
+
+  # common exclusions you usually want to keep out of built wheels
+  ".git/**",
+  ".venv/**",
+  "venv/**",
+  "dist/**",
+  "build/**",
+  "__pycache__/**",
+  ".pytest_cache/**"
+]
+
