@@ -11,19 +11,17 @@ requires-python = ">=3.12"
 dependencies = []
 
 [tool.hatch.build.targets.wheel]
-#this is to show which folder should be present in the packages
-packages = ["src/**"]
+# Tell hatchling: all packages live under "src"
+sources = ["src"]
 
-# include everything by default (repo root + nested files)
+# include everything (repo root + nested files)
 include = ["**"]
 
-# but exclude directories
 exclude = [
   "benchmark/**",
   "metadata/**",
   "scenarios/**",
 
-  # common exclusions you usually want to keep out of built wheels
   ".git/**",
   ".venv/**",
   "venv/**",
@@ -32,4 +30,3 @@ exclude = [
   "__pycache__/**",
   ".pytest_cache/**"
 ]
-
