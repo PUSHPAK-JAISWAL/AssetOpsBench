@@ -221,7 +221,7 @@ Expected execution output (trimmed):
      {"asset_name": "chiller", "failure_modes": ["Compressor Overheating: Failed due to Normal wear, overheating", ...]}
 ```
 
-> **Note:** Curated assets (`chiller`, `ahu`) are served from `failure_modes.yaml` without any LLM call. A `UserWarning` about Pydantic V1 from `langchain_core` is expected on Python 3.14 and does not affect functionality.
+> **Note:** Curated assets (`chiller`, `ahu`) are served from `failure_modes.yaml` without any LLM call.
 
 ### Python API
 

@@ -59,6 +59,8 @@ class StepResult:
     agent: str
     response: str
     error: Optional[str] = None
+    tool: str = ""
+    tool_args: dict = field(default_factory=dict)
 
     @property
     def success(self) -> bool:

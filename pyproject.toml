@@ -23,6 +23,7 @@ dependencies = [
     "langchain-core>=0.3",
     "langchain-ibm>=0.3",
     "litellm>=1.0",
+    "python-dotenv>=1.0",
 ]
 
 [project.scripts]

@@ -174,7 +174,7 @@ async def test_executor_get_agent_descriptions(mock_llm):
 
 @pytest.mark.anyio
 async def test_executor_resolves_placeholder_via_llm(mock_llm):
-    """Steps with {{step_N}} placeholders use an LLM call to resolve arg values."""
+    """Steps with {step_N} placeholders use an LLM call to resolve arg values."""
     from pathlib import Path
 
     resolved_json = json.dumps({"asset_id": "CH-1"})
@@ -185,7 +185,7 @@ async def test_executor_resolves_placeholder_via_llm(mock_llm):
         steps=[
             _make_step(1, tool="sites", tool_args={}),
             _make_step(2, tool="sensors",
-                       tool_args={"site_name": "MAIN", "asset_id": "{{step_1}}"},
+                       tool_args={"site_name": "MAIN", "asset_id": "{step_1}"},
                        deps=[1]),
         ],
         raw="",
@@ -205,6 +205,57 @@ async def test_executor_resolves_placeholder_via_llm(mock_llm):
     step2_args = call_mock.call_args_list[1].args[2]
     assert step2_args["site_name"] == "MAIN"   # known arg passed through
     assert step2_args["asset_id"] == "CH-1"    # resolved by LLM
+
+
+@pytest.mark.anyio
+async def test_pipeline_resolves_placeholder_from_planner_output(sequential_llm):
+    """Regression test for the {step_N} placeholder regex bug.
+
+    The planner LLM returns a plan string with {step_N} (single braces) in
+    Args — exactly what the LLM produces after _PLAN_PROMPT.format() renders
+    {{step_N}} -> {step_N}.  The executor must detect the placeholder, call the
+    LLM to resolve it, and forward the resolved value (not the placeholder
+    string) to the tool.
+
+    With the old regex r"\\{\\{step_(\\d+)\\}\\}" this test failed because
+    _has_placeholders() returned False for single-brace args, so the literal
+    string "{step_1}" was passed as site_name to the tool.
+    """
+    planner_output = (
+        "#Task1: Get IoT sites\n"
+        "#Agent1: IoTAgent\n"
+        "#Tool1: sites\n"
+        "#Args1: {}\n"
+        "#Dependency1: None\n"
+        "#ExpectedOutput1: List of site names\n\n"
+        "#Task2: Get assets at the site from step 1\n"
+        "#Agent2: IoTAgent\n"
+        "#Tool2: assets\n"
+        '#Args2: {"site_name": "{step_1}"}\n'
+        "#Dependency2: #S1\n"
+        "#ExpectedOutput2: List of assets"
+    )
+    llm = sequential_llm([
+        planner_output,            # planner call
+        '{"site_name": "MAIN"}',   # arg resolution for step 2
+        "Final answer.",           # summarisation
+    ])
+
+    site_resp = '{"sites": ["MAIN"]}'
+    asset_resp = '{"assets": ["CH-1"]}'
+    call_mock = AsyncMock(side_effect=[site_resp, asset_resp])
+
+    with (
+        patch("plan_execute.executor._list_tools", new=AsyncMock(return_value=_MOCK_TOOLS)),
+        patch("plan_execute.executor._call_tool", new=call_mock),
+    ):
+        result = await PlanExecuteRunner(llm).run("List all assets at site MAIN")
+
+    assert all(r.success for r in result.history)
+    # Step 2 must be called with the resolved value, not the placeholder string
+    step2_args = call_mock.call_args_list[1].args[2]
+    assert step2_args["site_name"] == "MAIN"
+    assert "{step_1}" not in str(step2_args)
 
 
 @pytest.mark.anyio
@@ -231,7 +282,7 @@ async def test_executor_no_placeholder_skips_llm(mock_llm):
 
 
 def test_has_placeholders_true():
-    assert _has_placeholders({"asset_id": "{{step_1}}"}) is True
+    assert _has_placeholders({"asset_id": "{step_1}"}) is True
 
 
 def test_has_placeholders_false():
@@ -256,7 +307,7 @@ async def test_resolve_args_with_llm_resolves_placeholder(mock_llm):
                          response='{"assets": ["CH-1", "CH-2"]}')}
     result = await _resolve_args_with_llm(
         "get sensors", "sensors",
-        {"site_name": "MAIN", "asset_id": "{{step_1}}"},
+        {"site_name": "MAIN", "asset_id": "{step_1}"},
         ctx, llm,
     )
     assert result["site_name"] == "MAIN"   # known arg unchanged
@@ -268,7 +319,7 @@ async def test_resolve_args_with_llm_fallback_on_bad_json(mock_llm):
     llm = mock_llm("I cannot determine the value.")
     ctx = {1: StepResult(step_number=1, task="t", agent="a", response="data")}
     result = await _resolve_args_with_llm(
-        "task", "tool", {"x": "{{step_1}}"}, ctx, llm
+        "task", "tool", {"x": "{step_1}"}, ctx, llm
     )
     # Bad JSON → empty dict merged with known args (none here) → x absent
     assert result == {}
@@ -284,13 +335,13 @@ def test_resolve_args_no_placeholders():
 
 def test_resolve_args_replaces_placeholder():
     ctx = {1: StepResult(step_number=1, task="t", agent="a", response="MAIN")}
-    resolved = _resolve_args({"site_name": "{{step_1}}"}, ctx)
+    resolved = _resolve_args({"site_name": "{step_1}"}, ctx)
     assert resolved["site_name"] == "MAIN"
 
 
 def test_resolve_args_missing_step_keeps_placeholder():
-    resolved = _resolve_args({"site_name": "{{step_9}}"}, {})
-    assert resolved["site_name"] == "{{step_9}}"
+    resolved = _resolve_args({"site_name": "{step_9}"}, {})
+    assert resolved["site_name"] == "{step_9}"
 
 
 def test_resolve_args_non_string_values_unchanged():
