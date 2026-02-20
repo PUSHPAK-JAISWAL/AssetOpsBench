@@ -45,11 +45,3 @@ def mock_asset2fm_chain():
             yield mock
 
 
-@pytest.fixture
-def mock_asset2sensor_chain():
-    """Patch _asset2sensor_chain to return a fixed sensor list."""
-    mock = MagicMock()
-    mock.invoke.return_value = ["Temperature Sensor", "Pressure Sensor"]
-    with patch("servers.fmsr.main._asset2sensor_chain", mock):
-        with patch("servers.fmsr.main._llm_available", True):
-            yield mock

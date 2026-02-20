@@ -1,11 +1,10 @@
 """FMSR (Failure Mode and Sensor Reasoning) MCP Server.
 
-Exposes three tools:
+Exposes two tools:
   get_failure_modes               – lists failure modes for an asset
-  get_sensors                     – lists available sensors for an asset
   get_failure_mode_sensor_mapping – returns bidirectional FM↔sensor relevancy mapping
 
-For chillers and AHUs the first two tools return curated hardcoded lists.
+For chillers and AHUs get_failure_modes returns a curated hardcoded list.
 For any other asset type the LLM is queried as a fallback.
 The mapping tool always calls the LLM to determine per-pair relevancy.
 """
@@ -32,19 +31,6 @@ logger = logging.getLogger("fmsr-mcp-server")
 
 # ── Hardcoded asset data ──────────────────────────────────────────────────────
 
-_CHILLER_SENSORS = [
-    "Chiller % Loaded",
-    "Chiller Efficiency",
-    "Condenser Water Flow",
-    "Condenser Water Supply To Chiller Temperature",
-    "Liquid Refrigerant Evaporator Temperature",
-    "Power Input",
-    "Return Temperature",
-    "Schedule",
-    "Supply Temperature",
-    "Tonnage",
-]
-
 _ASSET_FAILURE_MODES: dict[str, list[str]] = {
     "chiller": [
         "Compressor Overheating: Failed due to Normal wear, overheating",
@@ -66,18 +52,6 @@ _ASSET_FAILURE_MODES: dict[str, list[str]] = {
 
 
 # ── Output parsers ────────────────────────────────────────────────────────────
-
-class _SensorParser(NumberedListOutputParser):
-    """Strips trailing 'Sensor(s)' suffix from numbered-list LLM output."""
-
-    def parse(self, text: str) -> List[str]:
-        sensors = re.findall(self.pattern, text)
-        return [
-            s.replace(" Sensors", "").replace(" sensors", "")
-             .replace(" Sensor", "").replace(" sensor", "")
-            for s in sensors
-        ]
-
 
 class _RelevancyParser(JsonOutputParser):
     """Parses a 3-line LLM response into {answer, reason, temporal_behavior}."""
@@ -105,14 +79,6 @@ _asset2fm_prompt = ChatPromptTemplate.from_template(
     "For example: \n\n1. foo\n\n2. bar\n\n3. baz"
 )
 
-_asset2sensor_prompt = ChatPromptTemplate.from_template(
-    "What are the sensors that can be installed in the asset {asset_name} "
-    "for monitoring the performance?\n"
-    "Your response should be a numbered list with each sensor name on a new line. "
-    "Please only list the sensor name.\n"
-    "For example: \n\n1. foo\n\n2. bar\n\n3. baz"
-)
-
 _relevancy_prompt = ChatPromptTemplate.from_template(
     "For the asset {asset_name}, if the failure {failure_mode} occurs, "
     "can sensor {sensor} help monitor or detect the failure for {asset_name}?\n"
@@ -137,17 +103,16 @@ def _build_chains():
     llm_with_retry = llm.with_retry(stop_after_attempt=3)
     return (
         _asset2fm_prompt | llm_with_retry | NumberedListOutputParser(),
-        _asset2sensor_prompt | llm_with_retry | _SensorParser(),
         _relevancy_prompt | llm | _RelevancyParser(),
     )
 
 
 try:
-    _asset2fm_chain, _asset2sensor_chain, _relevancy_chain = _build_chains()
+    _asset2fm_chain, _relevancy_chain = _build_chains()
     _llm_available = True
 except Exception as _e:
     logger.error("WatsonX LLM unavailable: %s", _e)
-    _asset2fm_chain = _asset2sensor_chain = _relevancy_chain = None
+    _asset2fm_chain = _relevancy_chain = None
     _llm_available = False
 
 
@@ -178,31 +143,6 @@ def get_failure_modes(asset_name: str) -> str:
         return json.dumps({"asset_name": asset_name, "failure_modes": result})
     except Exception as exc:
         logger.error("asset2fm_chain failed: %s", exc)
-        return json.dumps({"error": str(exc)})
-
-
-@mcp.tool()
-def get_sensors(asset_name: str) -> str:
-    """Returns a list of available sensors for the given asset.
-    For chillers returns a curated list. For other assets queries the LLM."""
-    asset_name = re.split(r"\n", asset_name)[0].strip()
-    if not asset_name:
-        return json.dumps({"error": "asset_name is required"})
-
-    if asset_name.lower().startswith("chiller"):
-        return json.dumps({
-            "asset_name": asset_name,
-            "sensors": [f"{asset_name} {s}" for s in _CHILLER_SENSORS],
-        })
-
-    if not _llm_available:
-        return json.dumps({"error": "LLM unavailable and asset not in local database"})
-
-    try:
-        result = _asset2sensor_chain.invoke({"asset_name": asset_name})
-        return json.dumps({"asset_name": asset_name, "sensors": result})
-    except Exception as exc:
-        logger.error("asset2sensor_chain failed: %s", exc)
         return json.dumps({"error": str(exc)})
 
 

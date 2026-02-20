@@ -61,50 +61,6 @@ class TestGetFailureModes:
 
 
 # ---------------------------------------------------------------------------
-# get_sensors
-# ---------------------------------------------------------------------------
-
-
-class TestGetSensors:
-    @pytest.mark.anyio
-    async def test_chiller_returns_hardcoded(self):
-        data = await call_tool(mcp, "get_sensors", {"asset_name": "Chiller 6"})
-        assert "sensors" in data
-        assert len(data["sensors"]) == 10
-        assert "Chiller 6 Power Input" in data["sensors"]
-
-    @pytest.mark.anyio
-    async def test_chiller_prefix_case_insensitive(self):
-        data = await call_tool(mcp, "get_sensors", {"asset_name": "chiller 1"})
-        assert "sensors" in data
-        assert len(data["sensors"]) == 10
-
-    @pytest.mark.anyio
-    async def test_empty_asset_name_returns_error(self):
-        data = await call_tool(mcp, "get_sensors", {"asset_name": ""})
-        assert "error" in data
-
-    @pytest.mark.anyio
-    async def test_unknown_asset_no_llm(self, no_llm):
-        data = await call_tool(mcp, "get_sensors", {"asset_name": "Pump"})
-        assert "error" in data
-
-    @pytest.mark.anyio
-    async def test_unknown_asset_llm_fallback(self, mock_asset2sensor_chain):
-        data = await call_tool(mcp, "get_sensors", {"asset_name": "Pump"})
-        assert "sensors" in data
-        assert data["sensors"] == ["Temperature Sensor", "Pressure Sensor"]
-        mock_asset2sensor_chain.invoke.assert_called_once_with({"asset_name": "Pump"})
-
-    @requires_watsonx
-    @pytest.mark.anyio
-    async def test_unknown_asset_integration(self):
-        data = await call_tool(mcp, "get_sensors", {"asset_name": "Boiler"})
-        assert "sensors" in data
-        assert len(data["sensors"]) > 0
-
-
-# ---------------------------------------------------------------------------
 # get_failure_mode_sensor_mapping
 # ---------------------------------------------------------------------------
 
