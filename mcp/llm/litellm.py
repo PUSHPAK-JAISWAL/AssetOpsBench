@@ -1,4 +1,16 @@
-"""LiteLLM backend via Anthropic Messages API endpoint."""
+"""Unified LLM backend via the litellm library.
+
+Supports any model string that litellm recognizes.  The provider is encoded
+in the model-string prefix — no separate platform flag is needed:
+
+    watsonx/meta-llama/llama-3-3-70b-instruct   → IBM WatsonX
+    litellm_proxy/GCP/claude-4-sonnet            → LiteLLM proxy
+
+Credentials are resolved from environment variables based on the prefix:
+
+    watsonx/*  :  WATSONX_APIKEY, WATSONX_PROJECT_ID, WATSONX_URL (optional)
+    otherwise  :  LITELLM_API_KEY, LITELLM_BASE_URL
+"""
 
 from __future__ import annotations
 
@@ -7,39 +19,36 @@ import os
 from .base import LLMBackend
 
 
-class LiteLLMLLM(LLMBackend):
-    """LiteLLM backend using the Anthropic Messages API endpoint.
-
-    Reads credentials from environment variables:
-        LITELLM_API_KEY    — required
-        LITELLM_BASE_URL   — required (e.g. https://your-litellm-host.example.com)
+class LiteLLMBackend(LLMBackend):
+    """LLM backend using the litellm library.
 
     Args:
-        model_id: Model string passed to LiteLLM (e.g. "GCP/claude-4-sonnet").
+        model_id: litellm model string with provider prefix, e.g.:
+                  ``"watsonx/meta-llama/llama-3-3-70b-instruct"``
+                  ``"litellm_proxy/GCP/claude-4-sonnet"``
     """
 
-    def __init__(self, model_id: str = "GCP/claude-4-sonnet") -> None:
-        self._api_key = os.environ["LITELLM_API_KEY"]
-        base_url = os.environ["LITELLM_BASE_URL"]
-        self._messages_url = base_url.rstrip("/") + "/v1/messages"
+    def __init__(self, model_id: str) -> None:
         self._model_id = model_id
 
     def generate(self, prompt: str, temperature: float = 0.0) -> str:
-        import requests
+        import litellm
 
-        resp = requests.post(
-            self._messages_url,
-            headers={
-                "Authorization": f"Bearer {self._api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": self._model_id,
-                "max_tokens": 2048,
-                "temperature": temperature,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-            timeout=120,
-        )
-        resp.raise_for_status()
-        return resp.json()["content"][0]["text"]
+        kwargs: dict = {
+            "model": self._model_id,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "max_tokens": 2048,
+        }
+
+        if self._model_id.startswith("watsonx/"):
+            kwargs["api_key"] = os.environ["WATSONX_APIKEY"]
+            kwargs["project_id"] = os.environ["WATSONX_PROJECT_ID"]
+            if url := os.environ.get("WATSONX_URL"):
+                kwargs["api_base"] = url
+        else:
+            kwargs["api_key"] = os.environ["LITELLM_API_KEY"]
+            kwargs["api_base"] = os.environ["LITELLM_BASE_URL"]
+
+        response = litellm.completion(**kwargs)
+        return response.choices[0].message.content

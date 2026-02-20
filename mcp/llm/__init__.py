@@ -1,7 +1,6 @@
-"""LLM backend implementations for AssetOpsBench MCP."""
+"""LLM backend for AssetOpsBench MCP."""
 
 from .base import LLMBackend
-from .litellm import LiteLLMLLM
-from .watsonx import WatsonXLLM
+from .litellm import LiteLLMBackend
 
-__all__ = ["LLMBackend", "LiteLLMLLM", "WatsonXLLM"]
+__all__ = ["LLMBackend", "LiteLLMBackend"]

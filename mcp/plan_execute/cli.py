@@ -2,8 +2,8 @@
 
 Usage:
     plan-execute "What assets are available at site MAIN?"
-    plan-execute --platform watsonx --model-id ibm/granite-3-3-8b-instruct --show-plan "List sensors"
-    plan-execute --server FMSRAgent=servers/fmsr/main.py "What are the failure modes?"
+    plan-execute --model-id watsonx/ibm/granite-3-3-8b-instruct --show-plan "List sensors"
+    plan-execute --model-id litellm_proxy/GCP/claude-4-sonnet "What are the failure modes?"
     plan-execute --json "What is the current time?"
 """
 
@@ -16,7 +16,7 @@ import logging
 import sys
 from pathlib import Path
 
-_PLATFORMS = ["watsonx", "litellm"]
+_DEFAULT_MODEL = "watsonx/meta-llama/llama-4-maverick-17b-128e-instruct-fp8"
 
 _LOG_FORMAT = "%(asctime)s  %(levelname)-8s  %(name)s  %(message)s"
 _LOG_DATE_FORMAT = "%H:%M:%S"
@@ -27,36 +27,35 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="plan-execute",
         description="Run a question through the MCP plan-execute workflow.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog=f"""
+model-id format:
+  The provider is encoded in the model-id prefix:
+    watsonx/<model>          IBM WatsonX  (e.g. watsonx/meta-llama/llama-3-3-70b-instruct)
+    litellm_proxy/<model>    LiteLLM proxy (e.g. litellm_proxy/GCP/claude-4-sonnet)
+
 environment variables:
-  WATSONX_APIKEY        IBM WatsonX API key (required for --platform watsonx)
-  WATSONX_PROJECT_ID    IBM WatsonX project ID (required for --platform watsonx)
-  WATSONX_URL           IBM WatsonX endpoint (optional, defaults to us-south)
+  WATSONX_APIKEY        IBM WatsonX API key      (required for watsonx/* models)
+  WATSONX_PROJECT_ID    IBM WatsonX project ID   (required for watsonx/* models)
+  WATSONX_URL           IBM WatsonX endpoint     (optional, defaults to us-south)
 
-  LITELLM_API_KEY       LiteLLM API key (required for --platform litellm)
-  LITELLM_BASE_URL      LiteLLM base URL (required for --platform litellm)
+  LITELLM_API_KEY       LiteLLM API key          (required for non-watsonx models)
+  LITELLM_BASE_URL      LiteLLM base URL         (required for non-watsonx models)
 
-  LOG_LEVEL             Log level for MCP servers when run standalone (default: WARNING)
+  LOG_LEVEL             Log level for MCP servers (default: WARNING)
 
 examples:
   plan-execute "What assets are at site MAIN?"
-  plan-execute --platform watsonx --model-id ibm/granite-3-3-8b-instruct --show-plan "List sensors"
-  plan-execute --server FMSRAgent=servers/fmsr/main.py "What are the failure modes?"
+  plan-execute --model-id watsonx/ibm/granite-3-3-8b-instruct --show-plan "List sensors"
+  plan-execute --model-id litellm_proxy/GCP/claude-4-sonnet "What are the failure modes?"
   plan-execute --verbose --show-history --json "How many IoT observations exist for CH-1?"
 """,
     )
     parser.add_argument("question", help="The question to answer.")
     parser.add_argument(
-        "--platform",
-        choices=_PLATFORMS,
-        default="watsonx",
-        help="LLM platform to use (default: watsonx).",
-    )
-    parser.add_argument(
         "--model-id",
-        default="meta-llama/llama-4-maverick-17b-128e-instruct-fp8",
+        default=_DEFAULT_MODEL,
         metavar="MODEL_ID",
-        help="Model ID string for the selected platform (default: meta-llama/llama-4-maverick-17b-128e-instruct-fp8).",
+        help=f"litellm model string with provider prefix (default: {_DEFAULT_MODEL}).",
     )
     parser.add_argument(
         "--server",
@@ -66,7 +65,7 @@ examples:
         default=[],
         help=(
             "Register an MCP server as NAME=PATH. "
-            "Overrides the default IoTAgent and Utilities servers. "
+            "Overrides the default servers. "
             "Repeatable."
         ),
     )
@@ -104,34 +103,18 @@ def _setup_logging(verbose: bool) -> None:
     logging.root.setLevel(level)
 
 
-def _build_llm(platform: str, model_id: str):
-    """Instantiate the LLM backend for the given platform."""
-    if platform == "watsonx":
-        try:
-            from llm.watsonx import WatsonXLLM
-        except ImportError as exc:
-            print(f"error: {exc}", file=sys.stderr)
-            sys.exit(1)
-        try:
-            return WatsonXLLM(model_id=model_id)
-        except KeyError as exc:
-            print(f"error: missing environment variable {exc}", file=sys.stderr)
-            sys.exit(1)
-
-    if platform == "litellm":
-        try:
-            from llm.litellm import LiteLLMLLM
-        except ImportError as exc:
-            print(f"error: {exc}", file=sys.stderr)
-            sys.exit(1)
-        try:
-            return LiteLLMLLM(model_id=model_id)
-        except KeyError as exc:
-            print(f"error: missing environment variable {exc}", file=sys.stderr)
-            sys.exit(1)
-
-    print(f"error: unknown platform {platform!r}", file=sys.stderr)
-    sys.exit(1)
+def _build_llm(model_id: str):
+    """Instantiate the LiteLLMBackend for the given model_id."""
+    try:
+        from llm.litellm import LiteLLMBackend
+    except ImportError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(1)
+    try:
+        return LiteLLMBackend(model_id=model_id)
+    except KeyError as exc:
+        print(f"error: missing environment variable {exc}", file=sys.stderr)
+        sys.exit(1)
 
 
 def _parse_servers(entries: list[str]) -> dict[str, Path] | None:
@@ -160,7 +143,7 @@ def _print_section(title: str) -> None:
 async def _run(args: argparse.Namespace) -> None:
     from plan_execute.runner import PlanExecuteRunner
 
-    llm = _build_llm(args.platform, args.model_id)
+    llm = _build_llm(args.model_id)
     server_paths = _parse_servers(args.servers)
     runner = PlanExecuteRunner(llm=llm, server_paths=server_paths)
     result = await runner.run(args.question)
