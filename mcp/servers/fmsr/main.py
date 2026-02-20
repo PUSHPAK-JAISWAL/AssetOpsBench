@@ -14,10 +14,17 @@ from __future__ import annotations
 import logging
 import os
 import re
+import warnings
 from pathlib import Path
 from typing import Dict, List, Union
 
 import yaml
+
+warnings.filterwarnings(
+    "ignore",
+    message="Core Pydantic V1 functionality",
+    category=UserWarning,
+)
 
 from dotenv import load_dotenv
 from langchain_core.output_parsers import JsonOutputParser, NumberedListOutputParser

@@ -41,4 +41,7 @@ package = true
 
 [tool.pytest.ini_options]
 pythonpath = ["mcp"]
+filterwarnings = [
+    "ignore:Core Pydantic V1 functionality:UserWarning",
+]
 
