@@ -3,12 +3,11 @@ import logging
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Any
 from uuid import uuid4
 
 import pendulum
 from mcp.server.fastmcp import FastMCP
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 import os
 
@@ -19,6 +18,17 @@ logging.basicConfig(level=_log_level)
 logger = logging.getLogger("utilities-mcp-server")
 
 mcp = FastMCP("Utilities")
+
+
+class DateTimeResult(BaseModel):
+    currentDateTime: str
+    currentDateTimeDescription: str
+
+
+class TimeEnglishResult(BaseModel):
+    english: str
+    iso: str
+
 
 # --- Helper Functions ---
 
@@ -55,7 +65,7 @@ def json_reader(file_name: str) -> str:
 
 
 @mcp.tool()
-def current_date_time() -> str:
+def current_date_time() -> DateTimeResult:
     """Provides the current date time as a JSON object."""
     now = datetime.now(timezone.utc)
     now_iso = now.isoformat().replace("+00:00", "Z")
@@ -65,13 +75,11 @@ def current_date_time() -> str:
 
     description = f"Today's date is {date_part} and time is {time_part}."
 
-    return json.dumps(
-        {"currentDateTime": now_iso, "currentDateTimeDescription": description}
-    )
+    return DateTimeResult(currentDateTime=now_iso, currentDateTimeDescription=description)
 
 
 @mcp.tool()
-def current_time_english() -> str:
+def current_time_english() -> TimeEnglishResult:
     """Returns the current time in English text."""
     now = datetime.now(timezone.utc)
     now_iso = now.isoformat().replace("+00:00", "Z")
@@ -79,7 +87,7 @@ def current_time_english() -> str:
     dt = pendulum.parse(now_iso)
     eng = dt.to_datetime_string()
 
-    return json.dumps({"english": eng, "iso": now_iso})
+    return TimeEnglishResult(english=eng, iso=now_iso)
 
 
 def main():

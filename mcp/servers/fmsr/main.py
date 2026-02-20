@@ -11,16 +11,16 @@ The mapping tool always calls the LLM to determine per-pair relevancy.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import re
-from typing import List
+from typing import Dict, List, Union
 
 from dotenv import load_dotenv
 from langchain_core.output_parsers import JsonOutputParser, NumberedListOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from mcp.server.fastmcp import FastMCP
+from pydantic import BaseModel
 
 load_dotenv()
 
@@ -116,34 +116,67 @@ except Exception as _e:
     _llm_available = False
 
 
+# ── Result models ─────────────────────────────────────────────────────────────
+
+class ErrorResult(BaseModel):
+    error: str
+
+
+class FailureModesResult(BaseModel):
+    asset_name: str
+    failure_modes: List[str]
+
+
+class RelevancyEntry(BaseModel):
+    asset_name: str
+    failure_mode: str
+    sensor: str
+    relevancy_answer: str
+    relevancy_reason: str
+    temporal_behavior: str
+
+
+class MappingMetadata(BaseModel):
+    asset_name: str
+    failure_modes: List[str]
+    sensors: List[str]
+
+
+class FailureModeSensorMappingResult(BaseModel):
+    metadata: MappingMetadata
+    fm2sensor: Dict[str, List[str]]
+    sensor2fm: Dict[str, List[str]]
+    full_relevancy: List[RelevancyEntry]
+
+
 # ── FastMCP server ────────────────────────────────────────────────────────────
 
 mcp = FastMCP("FMSRAgent")
 
 
 @mcp.tool()
-def get_failure_modes(asset_name: str) -> str:
+def get_failure_modes(asset_name: str) -> Union[FailureModesResult, ErrorResult]:
     """Returns a list of known failure modes for the given asset.
     For chillers and AHUs returns a curated list. For other assets queries the LLM."""
     asset_key = re.sub(r"\d+", "", asset_name).strip().lower()
     if not asset_key or asset_key == "none":
-        return json.dumps({"error": "asset_name is required"})
+        return ErrorResult(error="asset_name is required")
 
     if asset_key in _ASSET_FAILURE_MODES:
-        return json.dumps({
-            "asset_name": asset_name,
-            "failure_modes": _ASSET_FAILURE_MODES[asset_key],
-        })
+        return FailureModesResult(
+            asset_name=asset_name,
+            failure_modes=_ASSET_FAILURE_MODES[asset_key],
+        )
 
     if not _llm_available:
-        return json.dumps({"error": "LLM unavailable and asset not in local database"})
+        return ErrorResult(error="LLM unavailable and asset not in local database")
 
     try:
         result = _asset2fm_chain.invoke({"asset_name": asset_name})
-        return json.dumps({"asset_name": asset_name, "failure_modes": result})
+        return FailureModesResult(asset_name=asset_name, failure_modes=result)
     except Exception as exc:
         logger.error("asset2fm_chain failed: %s", exc)
-        return json.dumps({"error": str(exc)})
+        return ErrorResult(error=str(exc))
 
 
 @mcp.tool()
@@ -151,18 +184,18 @@ def get_failure_mode_sensor_mapping(
     asset_name: str,
     failure_modes: List[str],
     sensors: List[str],
-) -> str:
+) -> Union[FailureModeSensorMappingResult, ErrorResult]:
     """For each (failure_mode, sensor) pair determines whether the sensor can detect
     the failure. Returns a bidirectional mapping (fm→sensors, sensor→fms) plus
     the full per-pair relevancy details."""
     if not asset_name:
-        return json.dumps({"error": "asset_name is required"})
+        return ErrorResult(error="asset_name is required")
     if not failure_modes:
-        return json.dumps({"error": "failure_modes list is required"})
+        return ErrorResult(error="failure_modes list is required")
     if not sensors:
-        return json.dumps({"error": "sensors list is required"})
+        return ErrorResult(error="sensors list is required")
     if not _llm_available:
-        return json.dumps({"error": "LLM unavailable"})
+        return ErrorResult(error="LLM unavailable")
 
     batches = [
         {"asset_name": asset_name, "failure_mode": fm, "sensor": s}
@@ -174,33 +207,35 @@ def get_failure_mode_sensor_mapping(
         generations = _relevancy_chain.batch(batches, config={"max_concurrency": 1})
     except Exception as exc:
         logger.error("relevancy_chain.batch failed: %s", exc)
-        return json.dumps({"error": str(exc)})
+        return ErrorResult(error=str(exc))
 
-    full_relevancy = []
-    fm2sensor: dict = {}
-    sensor2fm: dict = {}
+    full_relevancy: List[RelevancyEntry] = []
+    fm2sensor: Dict[str, List[str]] = {}
+    sensor2fm: Dict[str, List[str]] = {}
     for batch, gen in zip(batches, generations):
-        entry = {
-            **batch,
-            "relevancy_answer": gen["answer"],
-            "relevancy_reason": gen["reason"],
-            "temporal_behavior": gen["temporal_behavior"],
-        }
+        entry = RelevancyEntry(
+            asset_name=batch["asset_name"],
+            failure_mode=batch["failure_mode"],
+            sensor=batch["sensor"],
+            relevancy_answer=gen["answer"],
+            relevancy_reason=gen["reason"],
+            temporal_behavior=gen["temporal_behavior"],
+        )
         full_relevancy.append(entry)
         if "yes" in gen["answer"].lower():
             fm2sensor.setdefault(batch["failure_mode"], []).append(batch["sensor"])
             sensor2fm.setdefault(batch["sensor"], []).append(batch["failure_mode"])
 
-    return json.dumps({
-        "metadata": {
-            "asset_name": asset_name,
-            "failure_modes": failure_modes,
-            "sensors": sensors,
-        },
-        "fm2sensor": fm2sensor,
-        "sensor2fm": sensor2fm,
-        "full_relevancy": full_relevancy,
-    })
+    return FailureModeSensorMappingResult(
+        metadata=MappingMetadata(
+            asset_name=asset_name,
+            failure_modes=failure_modes,
+            sensors=sensors,
+        ),
+        fm2sensor=fm2sensor,
+        sensor2fm=sensor2fm,
+        full_relevancy=full_relevancy,
+    )
 
 
 def main():
