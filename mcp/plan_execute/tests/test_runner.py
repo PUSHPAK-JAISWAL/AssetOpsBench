@@ -208,6 +208,57 @@ async def test_executor_resolves_placeholder_via_llm(mock_llm):
 
 
 @pytest.mark.anyio
+async def test_pipeline_resolves_placeholder_from_planner_output(sequential_llm):
+    """Regression test for the {step_N} placeholder regex bug.
+
+    The planner LLM returns a plan string with {step_N} (single braces) in
+    Args — exactly what the LLM produces after _PLAN_PROMPT.format() renders
+    {{step_N}} -> {step_N}.  The executor must detect the placeholder, call the
+    LLM to resolve it, and forward the resolved value (not the placeholder
+    string) to the tool.
+
+    With the old regex r"\\{\\{step_(\\d+)\\}\\}" this test failed because
+    _has_placeholders() returned False for single-brace args, so the literal
+    string "{step_1}" was passed as site_name to the tool.
+    """
+    planner_output = (
+        "#Task1: Get IoT sites\n"
+        "#Agent1: IoTAgent\n"
+        "#Tool1: sites\n"
+        "#Args1: {}\n"
+        "#Dependency1: None\n"
+        "#ExpectedOutput1: List of site names\n\n"
+        "#Task2: Get assets at the site from step 1\n"
+        "#Agent2: IoTAgent\n"
+        "#Tool2: assets\n"
+        '#Args2: {"site_name": "{step_1}"}\n'
+        "#Dependency2: #S1\n"
+        "#ExpectedOutput2: List of assets"
+    )
+    llm = sequential_llm([
+        planner_output,            # planner call
+        '{"site_name": "MAIN"}',   # arg resolution for step 2
+        "Final answer.",           # summarisation
+    ])
+
+    site_resp = '{"sites": ["MAIN"]}'
+    asset_resp = '{"assets": ["CH-1"]}'
+    call_mock = AsyncMock(side_effect=[site_resp, asset_resp])
+
+    with (
+        patch("plan_execute.executor._list_tools", new=AsyncMock(return_value=_MOCK_TOOLS)),
+        patch("plan_execute.executor._call_tool", new=call_mock),
+    ):
+        result = await PlanExecuteRunner(llm).run("List all assets at site MAIN")
+
+    assert all(r.success for r in result.history)
+    # Step 2 must be called with the resolved value, not the placeholder string
+    step2_args = call_mock.call_args_list[1].args[2]
+    assert step2_args["site_name"] == "MAIN"
+    assert "{step_1}" not in str(step2_args)
+
+
+@pytest.mark.anyio
 async def test_executor_no_placeholder_skips_llm(mock_llm):
     """Steps without placeholders do not trigger an LLM call."""
     from pathlib import Path
