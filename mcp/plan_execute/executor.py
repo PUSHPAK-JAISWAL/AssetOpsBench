@@ -32,7 +32,7 @@ DEFAULT_SERVER_PATHS: dict[str, Path] = {
     "FMSRAgent": _MCP_ROOT / "servers" / "fmsr" / "main.py",
 }
 
-_PLACEHOLDER_RE = re.compile(r"\{\{step_(\d+)\}\}")
+_PLACEHOLDER_RE = re.compile(r"\{step_(\d+)\}")
 
 _ARG_RESOLUTION_PROMPT = """\
 You are resolving tool argument values for one step in a multi-step plan.

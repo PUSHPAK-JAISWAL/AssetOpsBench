@@ -174,7 +174,7 @@ async def test_executor_get_agent_descriptions(mock_llm):
 
 @pytest.mark.anyio
 async def test_executor_resolves_placeholder_via_llm(mock_llm):
-    """Steps with {{step_N}} placeholders use an LLM call to resolve arg values."""
+    """Steps with {step_N} placeholders use an LLM call to resolve arg values."""
     from pathlib import Path
 
     resolved_json = json.dumps({"asset_id": "CH-1"})
@@ -185,7 +185,7 @@ async def test_executor_resolves_placeholder_via_llm(mock_llm):
         steps=[
             _make_step(1, tool="sites", tool_args={}),
             _make_step(2, tool="sensors",
-                       tool_args={"site_name": "MAIN", "asset_id": "{{step_1}}"},
+                       tool_args={"site_name": "MAIN", "asset_id": "{step_1}"},
                        deps=[1]),
         ],
         raw="",
@@ -231,7 +231,7 @@ async def test_executor_no_placeholder_skips_llm(mock_llm):
 
 
 def test_has_placeholders_true():
-    assert _has_placeholders({"asset_id": "{{step_1}}"}) is True
+    assert _has_placeholders({"asset_id": "{step_1}"}) is True
 
 
 def test_has_placeholders_false():
@@ -256,7 +256,7 @@ async def test_resolve_args_with_llm_resolves_placeholder(mock_llm):
                          response='{"assets": ["CH-1", "CH-2"]}')}
     result = await _resolve_args_with_llm(
         "get sensors", "sensors",
-        {"site_name": "MAIN", "asset_id": "{{step_1}}"},
+        {"site_name": "MAIN", "asset_id": "{step_1}"},
         ctx, llm,
     )
     assert result["site_name"] == "MAIN"   # known arg unchanged
@@ -268,7 +268,7 @@ async def test_resolve_args_with_llm_fallback_on_bad_json(mock_llm):
     llm = mock_llm("I cannot determine the value.")
     ctx = {1: StepResult(step_number=1, task="t", agent="a", response="data")}
     result = await _resolve_args_with_llm(
-        "task", "tool", {"x": "{{step_1}}"}, ctx, llm
+        "task", "tool", {"x": "{step_1}"}, ctx, llm
     )
     # Bad JSON → empty dict merged with known args (none here) → x absent
     assert result == {}
@@ -284,13 +284,13 @@ def test_resolve_args_no_placeholders():
 
 def test_resolve_args_replaces_placeholder():
     ctx = {1: StepResult(step_number=1, task="t", agent="a", response="MAIN")}
-    resolved = _resolve_args({"site_name": "{{step_1}}"}, ctx)
+    resolved = _resolve_args({"site_name": "{step_1}"}, ctx)
     assert resolved["site_name"] == "MAIN"
 
 
 def test_resolve_args_missing_step_keeps_placeholder():
-    resolved = _resolve_args({"site_name": "{{step_9}}"}, {})
-    assert resolved["site_name"] == "{{step_9}}"
+    resolved = _resolve_args({"site_name": "{step_9}"}, {})
+    assert resolved["site_name"] == "{step_9}"
 
 
 def test_resolve_args_non_string_values_unchanged():
