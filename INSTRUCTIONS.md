@@ -10,6 +10,7 @@ This directory contains the MCP servers and infrastructure for the AssetOpsBench
 - [MCP Servers](#mcp-servers)
   - [IoTAgent](#iotagent)
   - [Utilities](#utilities)
+  - [FMSRAgent](#fmsragent)
 - [Plan-Execute Runner](#plan-execute-runner)
   - [How it works](#how-it-works)
   - [CLI](#cli)
@@ -67,6 +68,7 @@ Use `uv run` to start the MCP servers (paths relative to repo root):
 ```bash
 uv run python mcp/servers/utilities/main.py
 uv run python mcp/servers/iot/main.py
+uv run python mcp/servers/fmsr/main.py
 ```
 
 ---
@@ -111,6 +113,17 @@ uv run python mcp/servers/iot/main.py
 | `json_reader` | `file_name` | Read and parse a JSON file from disk |
 | `current_date_time` | — | Return the current UTC date and time as JSON |
 | `current_time_english` | — | Return the current UTC time as a human-readable string |
+
+### FMSRAgent
+
+**Path:** `mcp/servers/fmsr/main.py`
+**Requires:** `WATSONX_APIKEY`, `WATSONX_PROJECT_ID`, `WATSONX_URL` for unknown assets; curated lists for `chiller` and `ahu` work without credentials.
+**Failure-mode data:** `mcp/servers/fmsr/failure_modes.yaml` (edit to add/change asset entries)
+
+| Tool | Arguments | Description |
+|---|---|---|
+| `get_failure_modes` | `asset_name` | Return known failure modes for an asset. Uses a curated YAML list for chillers and AHUs; falls back to the LLM for other types. |
+| `get_failure_mode_sensor_mapping` | `asset_name`, `failure_modes`, `sensors` | For each (failure mode, sensor) pair, determine relevancy via LLM. Returns bidirectional `fm→sensors` and `sensor→fms` maps plus full per-pair details. |
 
 ---
 
@@ -161,12 +174,42 @@ Examples:
 # Use a different model and inspect the plan
 plan-execute --model-id ibm/granite-3-3-8b-instruct --show-plan "List sensors for asset CH-1"
 
-# Register an additional MCP server
-plan-execute --server FMSRAgent=mcp/servers/fmsr/main.py "What are the failure modes?"
-
 # Machine-readable output
 plan-execute --show-history --json "How many observations exist for CH-1?" | jq .answer
 ```
+
+### Three-server end-to-end example
+
+All three servers (IoTAgent, Utilities, FMSRAgent) are registered by default.
+Run a question that exercises all three with independent parallel steps:
+
+```bash
+plan-execute --show-plan --show-history \
+  "What is the current date and time? Also list assets at site MAIN. Also get failure modes for a chiller."
+```
+
+Expected plan (3 parallel steps, no dependencies):
+
+```
+[1] Utilities  : current_date_time()
+[2] IoTAgent   : assets(site_name="MAIN")
+[3] FMSRAgent  : get_failure_modes(asset_name="chiller")
+```
+
+Expected execution output (trimmed):
+
+```
+[OK] Step 1 (Utilities)
+     {"currentDateTime": "2026-02-20T17:28:39Z", "currentDateTimeDescription": "Today's date is 2026-02-20 and time is 17:28:39."}
+
+[OK] Step 2 (IoTAgent)
+     {"site_name": "MAIN", "total_assets": 1, "assets": ["Chiller 6"], "message": "found 1 assets for site_name MAIN."}
+
+[OK] Step 3 (FMSRAgent)
+     {"asset_name": "chiller", "failure_modes": ["Compressor Overheating: Failed due to Normal wear, overheating", ...]}
+```
+
+> **Note:** FMSRAgent prints a WatsonX startup warning on Python 3.14 (`object.__init__() takes exactly one argument`) — this is a known `langchain-ibm` / Pydantic v1 compatibility issue and does not affect functionality. Curated assets (`chiller`, `ahu`) are served from `failure_modes.yaml` without any LLM call.
 
 ### Python API
 
@@ -215,7 +258,7 @@ runner = PlanExecuteRunner(
     server_paths={
         "IoTAgent":  Path("mcp/servers/iot/main.py"),
         "Utilities": Path("mcp/servers/utilities/main.py"),
-        "FMSRAgent": Path("mcp/servers/fmsr/main.py"),   # once implemented
+        "FMSRAgent": Path("mcp/servers/fmsr/main.py"),
     },
 )
 ```
@@ -259,31 +302,36 @@ Add the following to your Claude Desktop `claude_desktop_config.json`:
 
 ## Running Tests
 
-### Unit tests (no services required)
+Run the full suite from the repo root (unit + integration where services are available):
 
 ```bash
-# MCP servers
+uv run pytest mcp/ -v
+```
+
+Integration tests are auto-skipped when the required service is not available:
+- IoT integration tests require `COUCHDB_URL` (set in `.env`)
+- FMSR integration tests require `WATSONX_APIKEY` (set in `.env`)
+
+### Unit tests only (no services required)
+
+```bash
+uv run pytest mcp/ -v -k "not integration"
+```
+
+### Per-server
+
+```bash
 uv run pytest mcp/servers/iot/tests/test_tools.py -k "not integration"
 uv run pytest mcp/servers/utilities/tests/
-
-# plan_execute (all unit tests, no CouchDB or WatsonX needed)
+uv run pytest mcp/servers/fmsr/tests/ -k "not integration"
 uv run pytest mcp/plan_execute/tests/
 ```
 
-Run the full non-integration suite in one command:
-
-```bash
-uv run pytest mcp/servers/iot/tests/test_tools.py mcp/servers/utilities/tests/ mcp/plan_execute/tests/ -k "not integration"
-```
-
-### Integration tests (requires CouchDB)
-
-Integration tests are skipped unless `COUCHDB_URL` is set (loaded from `.env` via `dotenv`):
+### Integration tests (requires CouchDB + WatsonX)
 
 ```bash
 docker compose -f mcp/couchdb/docker-compose.yaml up -d
-uv run pytest mcp/servers/iot/tests/
-uv run pytest mcp/servers/utilities/tests/
+uv run pytest mcp/ -v
 ```
 
 ---
@@ -307,6 +355,6 @@ uv run pytest mcp/servers/utilities/tests/
                     │ MCP protocol (stdio)
          ┌──────────┼──────────┐
          ▼          ▼          ▼
-      IoTAgent   Utilities   FMSRAgent ...
-      (tools)    (tools)     (planned)
+      IoTAgent   Utilities   FMSRAgent
+      (tools)    (tools)     (tools)
 ```
