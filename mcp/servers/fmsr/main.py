@@ -190,7 +190,12 @@ def get_failure_mode_sensor_mapping(
 ) -> Union[FailureModeSensorMappingResult, ErrorResult]:
     """For each (failure_mode, sensor) pair determines whether the sensor can detect
     the failure. Returns a bidirectional mapping (fm→sensors, sensor→fms) plus
-    the full per-pair relevancy details."""
+    the full per-pair relevancy details.
+
+    Note: one LLM call is made per (failure_mode, sensor) pair sequentially.
+    Keep both lists small (e.g. ≤5 failure modes, ≤10 sensors) to avoid long
+    runtimes. For a chiller with 7 failure modes and 20+ sensors the call will
+    take several minutes."""
     if not asset_name:
         return ErrorResult(error="asset_name is required")
     if not failure_modes:
