@@ -22,6 +22,24 @@
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/IBM/AssetOpsBench/blob/main/notebook/LLM_Agent.ipynb)
 </div>
 
+---
+
+## 📢 Call for Scenario Contribution
+We are expanding **AssetOpsBench** to cover a broader range of industrial challenges. We invite researchers and practitioners to contribute new scenarios, particularly in the following areas:
+
+* **Asset Classes:** Turbines, HVAC Systems, Pumps, Transformers, CNC Machines, Robotics, and so on.
+* **Task Domains:** Prognostics and Health Management, Remaining Useful Life (RUL) estimation, or Root Cause Analysis (RCA) and Diagnostic Analysis.
+
+**How to contribute:**
+1.  **Study** the [Hugging Face dataset](https://huggingface.co/datasets/ibm-research/AssetOpsBench).
+2.  **Define** your scenario following our [Guideline](https://github.com/IBM/AssetOpsBench/blob/extra_scenarios/experimental_scenarios/utterance_design_guideline.md).
+3.  **Submit** a Pull Request or open an [Issue](https://github.com/IBM/AssetOpsBench/issues) with the tag `new-scenario`.
+4. **Contact us** via email for large-scale data contributions or research collaborations:
+   * Dhaval Patel ([pateldha@us.ibm.com](mailto:pateldha@us.ibm.com))
+   * Nianjun Zhou ([jzhou@us.ibm.com](mailto:jzhou@us.ibm.com))
+
+---
+
 ## Resources
 - **Video Overview:** [AssetOpsBench - AI Agents for Industrial Asset Operations & Maintenance](https://www.youtube.com/watch?v=kXmBDMrKFjs) by Reliability Odyssey.
   
