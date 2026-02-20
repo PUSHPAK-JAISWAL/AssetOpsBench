@@ -6,7 +6,7 @@ credentials (skipped unless WATSONX_APIKEY is set).
 
 import pytest
 from servers.fmsr.main import mcp
-from conftest import call_tool, requires_watsonx
+from .conftest import call_tool, requires_watsonx
 
 
 # ---------------------------------------------------------------------------
