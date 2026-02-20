@@ -145,13 +145,6 @@ See **[INSTRUCTIONS.md](./INSTRUCTIONS.md)** for setup, usage, and testing.
 
 ---
 
-## System Diagram
-Visual overview of AssetOpsBench workflow:  
-
-![System Diagram](path/to/system_diagram.png)  <!-- Replace with your image path -->
-
----
-
 ## Leaderboards
 - Evaluated with **7 Large Language Models**  
 - Trajectories scored using **LLM Judge (Llama-4-Maverick-17B)**  
