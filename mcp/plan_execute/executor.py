@@ -29,6 +29,7 @@ _MCP_ROOT = Path(__file__).parent.parent
 DEFAULT_SERVER_PATHS: dict[str, Path] = {
     "IoTAgent": _MCP_ROOT / "servers" / "iot" / "main.py",
     "Utilities": _MCP_ROOT / "servers" / "utilities" / "main.py",
+    "FMSRAgent": _MCP_ROOT / "servers" / "fmsr" / "main.py",
 }
 
 _PLACEHOLDER_RE = re.compile(r"\{\{step_(\d+)\}\}")
