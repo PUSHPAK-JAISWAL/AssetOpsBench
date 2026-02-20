@@ -169,6 +169,8 @@ async def _run(args: argparse.Namespace) -> None:
                     "step": r.step_number,
                     "task": r.task,
                     "agent": r.agent,
+                    "tool": r.tool,
+                    "tool_args": r.tool_args,
                     "response": r.response,
                     "error": r.error,
                     "success": r.success,
@@ -192,6 +194,8 @@ async def _run(args: argparse.Namespace) -> None:
         for r in result.history:
             status = "OK " if r.success else "ERR"
             print(f"  [{status}] Step {r.step_number} ({r.agent}): {r.task}")
+            if r.tool and r.tool.lower() not in ("none", "null", ""):
+                print(f"       tool: {r.tool}  args: {r.tool_args}")
             detail = r.response if r.success else f"Error: {r.error}"
             snippet = detail[:200] + ("..." if len(detail) > 200 else "")
             print(f"        {snippet}")
