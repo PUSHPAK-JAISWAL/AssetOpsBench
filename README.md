@@ -28,7 +28,7 @@
 We are expanding **AssetOpsBench** to cover a broader range of industrial challenges. We invite researchers and practitioners to contribute new scenarios, particularly in the following areas:
 
 * **Asset Classes:** Turbines, HVAC Systems, Pumps, Transformers, CNC Machines, Robotics, and so on.
-* **Task Domains:** Prognostics and Health Management, Remaining Useful Life (RUL) estimation, or Root Cause Analysis (RCA) and Diagnostic Analysis.
+* **Task Domains:** Prognostics and Health Management, Remaining Useful Life (RUL) estimation, or Root Cause Analysis (RCA), Diagnostic Analysis and Predictive Maintenance.
 
 **How to contribute:**
 1.  **Study** the [Hugging Face dataset](https://huggingface.co/datasets/ibm-research/AssetOpsBench).
