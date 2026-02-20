@@ -161,18 +161,30 @@ Flags:
 
 | Flag | Description |
 |---|---|
-| `--platform PLATFORM` | LLM platform to use: `watsonx` (default), `litellm` (coming soon) |
-| `--model-id MODEL_ID` | Model ID string for the selected platform (default: `meta-llama/llama-4-maverick-17b-128e-instruct-fp8`) |
+| `--model-id MODEL_ID` | litellm model string with provider prefix (default: `watsonx/meta-llama/llama-4-maverick-17b-128e-instruct-fp8`) |
 | `--server NAME=PATH` | Override MCP servers with `NAME=PATH` pairs (repeatable) |
 | `--show-plan` | Print the generated plan before execution |
 | `--show-history` | Print each step result after execution |
 | `--json` | Output answer + plan + history as JSON |
 
+The provider is encoded in the `--model-id` prefix:
+
+| Prefix | Provider | Required env vars |
+|---|---|---|
+| `watsonx/` | IBM WatsonX | `WATSONX_APIKEY`, `WATSONX_PROJECT_ID`, `WATSONX_URL` (optional) |
+| `litellm_proxy/` | LiteLLM proxy | `LITELLM_API_KEY`, `LITELLM_BASE_URL` |
+
 Examples:
 
 ```bash
-# Use a different model and inspect the plan
-plan-execute --model-id ibm/granite-3-3-8b-instruct --show-plan "List sensors for asset CH-1"
+# WatsonX — default model
+plan-execute "What assets are at site MAIN?"
+
+# WatsonX — different model, inspect the plan
+plan-execute --model-id watsonx/ibm/granite-3-3-8b-instruct --show-plan "List sensors for asset CH-1"
+
+# LiteLLM proxy
+plan-execute --model-id litellm_proxy/GCP/claude-4-sonnet "What are the failure modes for a chiller?"
 
 # Machine-readable output
 plan-execute --show-history --json "How many observations exist for CH-1?" | jq .answer
@@ -209,16 +221,16 @@ Expected execution output (trimmed):
      {"asset_name": "chiller", "failure_modes": ["Compressor Overheating: Failed due to Normal wear, overheating", ...]}
 ```
 
-> **Note:** FMSRAgent prints a WatsonX startup warning on Python 3.14 (`object.__init__() takes exactly one argument`) — this is a known `langchain-ibm` / Pydantic v1 compatibility issue and does not affect functionality. Curated assets (`chiller`, `ahu`) are served from `failure_modes.yaml` without any LLM call.
+> **Note:** Curated assets (`chiller`, `ahu`) are served from `failure_modes.yaml` without any LLM call. A `UserWarning` about Pydantic V1 from `langchain_core` is expected on Python 3.14 and does not affect functionality.
 
 ### Python API
 
 ```python
 import asyncio
 from plan_execute import PlanExecuteRunner
-from plan_execute.llm import WatsonXLLM
+from llm import LiteLLMBackend
 
-runner = PlanExecuteRunner(llm=WatsonXLLM(model_id=16))
+runner = PlanExecuteRunner(llm=LiteLLMBackend("watsonx/meta-llama/llama-3-3-70b-instruct"))
 result = asyncio.run(runner.run("What assets are available at site MAIN?"))
 print(result.answer)
 ```
