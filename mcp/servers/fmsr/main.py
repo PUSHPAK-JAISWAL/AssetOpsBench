@@ -79,6 +79,14 @@ _relevancy_prompt = ChatPromptTemplate.from_template(
 # ── LLM + chains (lazy init; graceful degradation if creds are absent) ────────
 
 def _build_chains():
+    # ibm_watsonx_ai's StrEnum subclass passes member args to super().__init__(),
+    # which Python 3.14's object.__init__ rejects. Patch before the full import
+    # chain reaches ibm_watsonx_ai.utils.autoai.enums where the class is defined.
+    import sys
+    if "ibm_watsonx_ai.utils.autoai.enums" not in sys.modules:
+        import ibm_watsonx_ai.utils.utils as _wx_utils
+        _wx_utils.StrEnum.__init__ = lambda self, *a, **k: None
+
     from langchain_ibm import ChatWatsonx
 
     llm = ChatWatsonx(
