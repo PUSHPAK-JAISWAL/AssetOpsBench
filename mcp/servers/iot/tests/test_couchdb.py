@@ -7,7 +7,7 @@ import couchdb3
 import requests
 from dotenv import load_dotenv
 
-from conftest import requires_couchdb
+from .conftest import requires_couchdb
 
 load_dotenv()
 

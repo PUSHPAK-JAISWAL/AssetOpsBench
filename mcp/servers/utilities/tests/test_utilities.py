@@ -6,7 +6,7 @@ import tempfile
 
 import pytest
 from servers.utilities.main import mcp
-from conftest import call_tool
+from .conftest import call_tool
 
 
 # ---------------------------------------------------------------------------

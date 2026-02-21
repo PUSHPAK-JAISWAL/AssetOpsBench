@@ -43,9 +43,9 @@ class PlanExecuteRunner:
     Usage::
 
         from plan_execute import PlanExecuteRunner
-        from llm import WatsonXLLM
+        from llm import LiteLLMBackend
 
-        runner = PlanExecuteRunner(llm=WatsonXLLM(model_id=16))
+        runner = PlanExecuteRunner(llm=LiteLLMBackend("watsonx/meta-llama/llama-3-3-70b-instruct"))
         result = await runner.run("What are the assets at site MAIN?")
         print(result.answer)
 

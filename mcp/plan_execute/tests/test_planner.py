@@ -1,5 +1,6 @@
 """Tests for the Planner and parse_plan()."""
 
+from plan_execute.executor import _has_placeholders
 from plan_execute.planner import Planner, parse_plan
 
 _TWO_STEP = """\
@@ -99,6 +100,54 @@ class TestParsePlan:
     def test_no_matching_blocks_yields_empty_plan(self):
         plan = parse_plan(_NO_TASKS)
         assert plan.steps == []
+
+    def test_placeholder_args_preserved_as_string(self):
+        """parse_plan stores {step_N} placeholder strings verbatim in tool_args.
+
+        This is the format the LLM actually generates: _PLAN_PROMPT uses
+        str.format(), which converts {{step_N}} in the template to {step_N}
+        (single braces) in the rendered prompt.  The LLM echoes that back.
+        """
+        raw = (
+            "#Task1: Get sites\n"
+            "#Agent1: IoTAgent\n"
+            "#Tool1: sites\n"
+            "#Args1: {}\n"
+            "#Dependency1: None\n"
+            "#ExpectedOutput1: Sites\n\n"
+            "#Task2: Get assets\n"
+            "#Agent2: IoTAgent\n"
+            "#Tool2: assets\n"
+            '#Args2: {"site_name": "{step_1}"}\n'
+            "#Dependency2: #S1\n"
+            "#ExpectedOutput2: Assets"
+        )
+        plan = parse_plan(raw)
+        assert plan.steps[1].tool_args == {"site_name": "{step_1}"}
+
+    def test_placeholder_in_parsed_args_detected(self):
+        """After parse_plan, {step_N} args are detected as placeholders by the executor.
+
+        Regression guard for the bug where _PLACEHOLDER_RE matched {{step_N}}
+        (double braces) instead of the {step_N} (single braces) that the LLM
+        actually produces.
+        """
+        raw = (
+            "#Task1: Get sites\n"
+            "#Agent1: IoTAgent\n"
+            "#Tool1: sites\n"
+            "#Args1: {}\n"
+            "#Dependency1: None\n"
+            "#ExpectedOutput1: Sites\n\n"
+            "#Task2: Get assets\n"
+            "#Agent2: IoTAgent\n"
+            "#Tool2: assets\n"
+            '#Args2: {"site_name": "{step_1}"}\n'
+            "#Dependency2: #S1\n"
+            "#ExpectedOutput2: Assets"
+        )
+        plan = parse_plan(raw)
+        assert _has_placeholders(plan.steps[1].tool_args) is True
 
     def test_invalid_args_json_falls_back_to_empty(self):
         raw = (

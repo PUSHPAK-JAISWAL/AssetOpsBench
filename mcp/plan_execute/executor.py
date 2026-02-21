@@ -29,9 +29,10 @@ _MCP_ROOT = Path(__file__).parent.parent
 DEFAULT_SERVER_PATHS: dict[str, Path] = {
     "IoTAgent": _MCP_ROOT / "servers" / "iot" / "main.py",
     "Utilities": _MCP_ROOT / "servers" / "utilities" / "main.py",
+    "FMSRAgent": _MCP_ROOT / "servers" / "fmsr" / "main.py",
 }
 
-_PLACEHOLDER_RE = re.compile(r"\{\{step_(\d+)\}\}")
+_PLACEHOLDER_RE = re.compile(r"\{step_(\d+)\}")
 
 _ARG_RESOLUTION_PROMPT = """\
 You are resolving tool argument values for one step in a multi-step plan.
@@ -133,6 +134,8 @@ class Executor:
                 task=step.task,
                 agent=step.agent,
                 response=step.expected_output,
+                tool=step.tool,
+                tool_args=step.tool_args,
             )
 
         try:
@@ -153,6 +156,8 @@ class Executor:
                 task=step.task,
                 agent=step.agent,
                 response=response,
+                tool=step.tool,
+                tool_args=resolved_args,
             )
         except Exception as exc:  # noqa: BLE001
             return StepResult(
@@ -161,6 +166,8 @@ class Executor:
                 agent=step.agent,
                 response="",
                 error=str(exc),
+                tool=step.tool,
+                tool_args=step.tool_args,
             )
 
 
