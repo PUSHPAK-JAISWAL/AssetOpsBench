@@ -31,8 +31,8 @@ We are expanding **AssetOpsBench** to cover a broader range of industrial challe
 * **Task Domains:** Prognostics and Health Management, Remaining Useful Life (RUL) estimation, or Root Cause Analysis (RCA), Diagnostic Analysis and Predictive Maintenance.
 
 **How to contribute:**
-1.  **Study** the [Hugging Face dataset](https://huggingface.co/datasets/ibm-research/AssetOpsBench).
-2.  **Define** your scenario following our [Guideline](https://github.com/IBM/AssetOpsBench/blob/extra_scenarios/experimental_scenarios/utterance_design_guideline.md).
+1.  **Define** your scenario following our [Guideline](https://github.com/IBM/AssetOpsBench/blob/extra_scenarios/experimental_scenarios/utterance_design_guideline.md).
+1.  **Explore** the [Hugging Face dataset](https://huggingface.co/datasets/ibm-research/AssetOpsBench) as examples.
 3.  **Submit** a Pull Request or open an [Issue](https://github.com/IBM/AssetOpsBench/issues) with the tag `new-scenario`.
 4. **Contact us** via email if any question:
    * Dhaval Patel ([pateldha@us.ibm.com](mailto:pateldha@us.ibm.com))
