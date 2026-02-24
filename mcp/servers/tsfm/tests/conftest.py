@@ -7,19 +7,22 @@ import os
 
 import pytest
 
-requires_watsonx = pytest.mark.skipif(
-    not os.environ.get("WATSONX_APIKEY"),
-    reason="WATSONX_APIKEY not set",
+# Skip marker for tests that require tsfm_public + its ML dependencies.
+def _tsfm_available() -> bool:
+    try:
+        import tsfm_public  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+requires_tsfm = pytest.mark.skipif(
+    not _tsfm_available(),
+    reason="tsfm_public not installed",
 )
 
 
-def call_tool(mcp, tool_name: str, args: dict) -> dict:
-    """Call an MCP tool and return the parsed JSON result."""
-    import asyncio
-    from mcp.server.fastmcp import FastMCP
-
-    async def _call():
-        result = await mcp._mcp_call_tool(tool_name, args)
-        return json.loads(result.content[0].text)
-
-    return asyncio.get_event_loop().run_until_complete(_call())
+async def call_tool(mcp_instance, tool_name: str, args: dict) -> dict:
+    """Helper: call an MCP tool and return the parsed JSON response."""
+    contents, _ = await mcp_instance.call_tool(tool_name, args)
+    return json.loads(contents[0].text)
