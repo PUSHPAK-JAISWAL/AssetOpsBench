@@ -44,12 +44,15 @@ from pydantic import BaseModel
 
 load_dotenv()
 
-_log_level = getattr(logging, os.environ.get("LOG_LEVEL", "WARNING").upper(), logging.WARNING)
+_log_level = getattr(
+    logging, os.environ.get("LOG_LEVEL", "WARNING").upper(), logging.WARNING
+)
 logging.basicConfig(level=_log_level)
 logger = logging.getLogger("tsfm-mcp-server")
 
 
 # ── Path / I/O helpers ────────────────────────────────────────────────────────
+
 
 def _get_model_checkpoint_path(model_checkpoint: str) -> str:
     if os.path.isabs(model_checkpoint):
@@ -98,9 +101,12 @@ def _make_json_compatible(obj):
 
 # ── Dataset reading ───────────────────────────────────────────────────────────
 
+
 def _read_ts_data(dataset_path: str, dataset_config_dictionary=None) -> pd.DataFrame:
     if dataset_config_dictionary is not None:
-        timestamp_column = dataset_config_dictionary["column_specifiers"]["timestamp_column"]
+        timestamp_column = dataset_config_dictionary["column_specifiers"][
+            "timestamp_column"
+        ]
     else:
         timestamp_column = "Date"
 
@@ -115,13 +121,16 @@ def _read_ts_data(dataset_path: str, dataset_config_dictionary=None) -> pd.DataF
     if ".csv" in dataset_path:
         if dataset_config_dictionary is not None:
             col_spec = dataset_config_dictionary["column_specifiers"]
-            data_df = pd.read_csv(dataset_path, parse_dates=[col_spec["timestamp_column"]])
+            data_df = pd.read_csv(
+                dataset_path, parse_dates=[col_spec["timestamp_column"]]
+            )
         else:
             data_df = pd.read_csv(dataset_path)
 
     elif ".json" in dataset_path:
         try:
-            result_dict = json.load(open(dataset_path))
+            with open(dataset_path) as _f:
+                result_dict = json.load(_f)
             ts: dict = {}
             for input_data in result_dict:
                 dt = datetime.fromisoformat(input_data["timestamp"])
@@ -133,22 +142,29 @@ def _read_ts_data(dataset_path: str, dataset_config_dictionary=None) -> pd.DataF
             for dt, v in ts.items():
                 data_df = pd.concat([data_df, pd.DataFrame(v, index=[dt])])
         except Exception as ex:
-            raise ValueError(f"input file {dataset_path} is not in the correct format") from ex
+            raise ValueError(
+                f"input file {dataset_path} is not in the correct format"
+            ) from ex
 
     elif ".xlsx" in dataset_path:
         if dataset_config_dictionary is not None:
             col_spec = dataset_config_dictionary["column_specifiers"]
-            data_df = pd.read_excel(dataset_path, parse_dates=[col_spec["timestamp_column"]])
+            data_df = pd.read_excel(
+                dataset_path, parse_dates=[col_spec["timestamp_column"]]
+            )
         else:
             data_df = pd.read_excel(dataset_path)
 
     else:
-        raise ValueError(f"file extension must be: .json, .csv, or .xlsx. file: {dataset_path}")
+        raise ValueError(
+            f"file extension must be: .json, .csv, or .xlsx. file: {dataset_path}"
+        )
 
     return data_df
 
 
 # ── Data quality helpers ──────────────────────────────────────────────────────
+
 
 def _threshold_condition_function(threshold, condition_type="<"):
     conditions = {
@@ -158,7 +174,9 @@ def _threshold_condition_function(threshold, condition_type="<"):
         ">=": lambda x: x >= threshold,
         "==": lambda x: x == threshold,
     }
-    assert condition_type in conditions, f"condition_type {condition_type!r} is not supported"
+    assert condition_type in conditions, (
+        f"condition_type {condition_type!r} is not supported"
+    )
     return conditions[condition_type]
 
 
@@ -184,7 +202,9 @@ def _df_nan_stats(df, perc_rows_less_than=None, perc_rows_more_than=None):
     return output
 
 
-def _df_percentage_samples_minutes_interval(df, date_col, lower_bound=14, upper_bound=16):
+def _df_percentage_samples_minutes_interval(
+    df, date_col, lower_bound=14, upper_bound=16
+):
     assert upper_bound >= lower_bound, "lower bound is larger than upper bound"
     df = df.sort_values(by=date_col)
     time_diffs = df[date_col].diff().dt.total_seconds() / 60.0
@@ -224,15 +244,12 @@ def _df_dt_stats(pd_dataset, date_col="Timestamp", intervals_dic=None):
     return data_specs
 
 
-def _df_single_columns_condition(df, condition_dic=None, verbose=False):
+def _df_single_columns_condition(df, condition_dic=None):
     if condition_dic is None:
         condition_dic = {}
     condition_count = {}
     for key, (column_name, condition) in condition_dic.items():
-        if column_name not in df.columns:
-            if verbose:
-                print("Column not found:", column_name)
-        else:
+        if column_name in df.columns:
             mask = df[column_name].apply(condition)
             condition_count[key] = {
                 "nsamples": int(np.sum(mask)),
@@ -280,23 +297,21 @@ def _remove_df_nans(df, p=50, dim="columns"):
     assert dim in ("columns", "rows")
     if dim == "columns":
         cols_to_drop = df.columns[df.isna().mean() > threshold]
-        print("Removing columns:", cols_to_drop)
         return df.drop(columns=cols_to_drop)
     rows_to_drop = df.index[df.isna().mean(axis=1) > threshold]
-    print("Removing n rows:", len(rows_to_drop))
     return df.drop(index=rows_to_drop)
 
 
-def _remove_df_rows_by_single_column_condition(df, column_name, condition, verbose=False):
+def _remove_df_rows_by_single_column_condition(df, column_name, condition):
     if column_name in df.columns:
         mask = df[column_name].apply(condition)
         return df[(1 - mask) == 1]
-    if verbose:
-        print("Column not found:", column_name)
     return df
 
 
-def _time_series_frequency_interval_segmentation(df, time_column, lower_bound=14, upper_bound=16):
+def _time_series_frequency_interval_segmentation(
+    df, time_column, lower_bound=14, upper_bound=16
+):
     df = df.sort_values(by=time_column).reset_index(drop=True)
     df["dt"] = df[time_column].diff().dt.total_seconds() / 60.0
     df["segment_id"] = 0
@@ -322,24 +337,31 @@ def _validate_time_series_segments(
 ):
     if dt_bounds is None:
         dt_bounds = [14, 16]
-    print("Validating TS Segments...")
     bad_quality_segments: dict = {}
     lower_bound, upper_bound = dt_bounds[0], dt_bounds[1]
     for seg_id in df_segment[segment_tag].unique():
         df_seg_i = df_segment.loc[df_segment[segment_tag] == seg_id]
-        dic_nan = _df_nan_stats(df_seg_i, perc_rows_less_than=[p_nan_rows], perc_rows_more_than=[p_nan_rows])
+        dic_nan = _df_nan_stats(
+            df_seg_i, perc_rows_less_than=[p_nan_rows], perc_rows_more_than=[p_nan_rows]
+        )
         if condition_off_dic is not None:
-            df_cond = _df_single_columns_condition(df_seg_i, condition_dic=condition_off_dic)
+            df_cond = _df_single_columns_condition(
+                df_seg_i, condition_dic=condition_off_dic
+            )
         nan_cols = list(dic_nan["%NaN_per_column"].values())
         qc: dict = {
             "nan_per_column": np.max(np.array(nan_cols)) <= p_nan_columns,
-            "nan_per_rows": list(dic_nan["%rows_more_than"].items())[0][1] <= p_nan_rows,
+            "nan_per_rows": list(dic_nan["%rows_more_than"].items())[0][1]
+            <= p_nan_rows,
         }
         if condition_off_dic is not None:
             cond_vals = [df_cond[k]["nsamples"] for k in df_cond]
             qc["condition_off"] = np.max(np.array(cond_vals)) == 0
         perc = _df_percentage_samples_minutes_interval(
-            df_seg_i, date_col=timestamp_tag, lower_bound=lower_bound, upper_bound=upper_bound
+            df_seg_i,
+            date_col=timestamp_tag,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
         )
         qc["sampling_dt_condition"] = perc == 100
         if not all(qc.values()):
@@ -352,8 +374,12 @@ def _time_series_segment_quality_summary(df, timestamp_column, segments_column):
     for ix_s in df[segments_column].unique():
         df_filter = df.loc[df[segments_column] == ix_s]
         ts_cont_segments[ix_s] = {
-            "start": pd.to_datetime(df_filter[timestamp_column].values[0]).strftime("%Y-%m-%d %H:%M:%S"),
-            "end": pd.to_datetime(df_filter[timestamp_column].values[-1]).strftime("%Y-%m-%d %H:%M:%S"),
+            "start": pd.to_datetime(df_filter[timestamp_column].values[0]).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            ),
+            "end": pd.to_datetime(df_filter[timestamp_column].values[-1]).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            ),
             "samples": len(df_filter),
             "%nans": df_filter.isna().mean().mean() * 100,
         }
@@ -366,7 +392,9 @@ _FILTERING_PARAMS_DEFAULT = {
 }
 
 
-def _dq_timeseries_segmentation(pd_merge, filtering_params=None, timestamp_tag="Timestamp"):
+def _dq_timeseries_segmentation(
+    pd_merge, filtering_params=None, timestamp_tag="Timestamp"
+):
     if filtering_params is None:
         filtering_params = _FILTERING_PARAMS_DEFAULT
     df_cleaned = pd_merge.copy()
@@ -375,12 +403,15 @@ def _dq_timeseries_segmentation(pd_merge, filtering_params=None, timestamp_tag="
 
     if "nans" in filtering_params:
         if "efficient_removal" in filtering_params["nans"]:
-            preference_tie = filtering_params["nans"]["efficient_removal"].get("preference_tie", "row")
-            output_efficient = _efficient_nan_removal(df_cleaned, preference_tie=preference_tie)
+            preference_tie = filtering_params["nans"]["efficient_removal"].get(
+                "preference_tie", "row"
+            )
+            output_efficient = _efficient_nan_removal(
+                df_cleaned, preference_tie=preference_tie
+            )
             df_cleaned = output_efficient["df_filter"]
             p_nan_columns = 1
             p_nan_rows = 1
-            print("Remove NaNs cost and actions:", output_efficient["cost_total"], output_efficient["actions"])
         if "p_nan_columns" in filtering_params["nans"]:
             p_nan_columns = filtering_params["nans"]["p_nan_columns"]
             df_cleaned = _remove_df_nans(df_cleaned, p=p_nan_columns, dim="columns")
@@ -388,7 +419,9 @@ def _dq_timeseries_segmentation(pd_merge, filtering_params=None, timestamp_tag="
             p_nan_rows = filtering_params["nans"]["p_nan_rows"]
             df_cleaned = _remove_df_nans(df_cleaned, p=p_nan_rows, dim="rows")
 
-    df_cleaned[timestamp_tag] = pd.to_datetime(df_cleaned[timestamp_tag], errors="coerce")
+    df_cleaned[timestamp_tag] = pd.to_datetime(
+        df_cleaned[timestamp_tag], errors="coerce"
+    )
     df_cleaned = df_cleaned.dropna(subset=[timestamp_tag])
 
     condition_off_dic = None
@@ -406,7 +439,7 @@ def _dq_timeseries_segmentation(pd_merge, filtering_params=None, timestamp_tag="
                     ),
                 )
             else:
-                print("Column", col, "not present in the cleaned dataset")
+                logger.debug("Column %s not present in the cleaned dataset", col)
         if condition_off_dic:
             for key in condition_off_dic:
                 df_cleaned = _remove_df_rows_by_single_column_condition(
@@ -431,23 +464,18 @@ def _dq_timeseries_segmentation(pd_merge, filtering_params=None, timestamp_tag="
     if bad_quality_segments:
         for seg_id in bad_quality_segments:
             df_segment = df_segment[df_segment["segment_id"] != seg_id]
-    bad_quality_segments = _validate_time_series_segments(
-        df_segment,
-        segment_tag="segment_id",
-        timestamp_tag=timestamp_tag,
-        p_nan_rows=p_nan_rows,
-        p_nan_columns=p_nan_columns,
-        condition_off_dic=condition_off_dic,
-        dt_bounds=[lower_bound, upper_bound],
-    )
-    print("Bad Quality Segments:", bad_quality_segments)
     return df_segment
 
 
 # ── Forecasting metrics ───────────────────────────────────────────────────────
 
+
 def _RMSE(y_true, y_pred, axis=None):
-    values = np.mean((y_true - y_pred) ** 2) if axis is None else np.mean((y_true - y_pred) ** 2, axis=axis)
+    values = (
+        np.mean((y_true - y_pred) ** 2)
+        if axis is None
+        else np.mean((y_true - y_pred) ** 2, axis=axis)
+    )
     return np.sqrt(values)
 
 
@@ -521,30 +549,40 @@ def _cosine_similarity_matrix(A, B, axis=1):
 
 def _loss_helper(outputs, targets, fn, axis=1):
     import torch
+
     outputs = outputs.astype(np.float64)
     targets = targets.squeeze()
     outputs = outputs.squeeze()
     if len(targets.shape) == 0 or targets.shape[0] == 0:
-        print("Nothing to compare")
         return np.array(0.0)
     if len(targets.shape) == 1:
         if targets.shape[0] < 4:
             return np.array([0.0])
-        return fn(
-            torch.from_numpy(targets.reshape(1, -1)),
-            torch.from_numpy(outputs.reshape(1, -1)),
-        ).cpu().detach().item()
+        return (
+            fn(
+                torch.from_numpy(targets.reshape(1, -1)),
+                torch.from_numpy(outputs.reshape(1, -1)),
+            )
+            .cpu()
+            .detach()
+            .item()
+        )
     B, T = targets.shape
     if axis == 1:
         if T < 4:
-            print("Too short to compare")
             return np.array([0.0])
-        return fn(torch.from_numpy(targets), torch.from_numpy(outputs)).cpu().detach().numpy()
+        return (
+            fn(torch.from_numpy(targets), torch.from_numpy(outputs))
+            .cpu()
+            .detach()
+            .numpy()
+        )
     return np.array(0.0)
 
 
 def _amp_loss(outputs, targets):
     import torch
+
     B, T = outputs.shape
     fft_size = 1 << (2 * T - 1).bit_length()
     out_f = torch.fft.fft(outputs, fft_size, dim=-1)
@@ -552,11 +590,11 @@ def _amp_loss(outputs, targets):
     out_norm = torch.linalg.vector_norm(outputs, dim=-1)
     tgt_norm = torch.linalg.vector_norm(targets, dim=-1)
     auto_corr = torch.fft.ifft(tgt_f * tgt_f.conj(), dim=-1).real
-    auto_corr = torch.cat([auto_corr[..., -(T - 1):], auto_corr[..., :T]], dim=-1)
+    auto_corr = torch.cat([auto_corr[..., -(T - 1) :], auto_corr[..., :T]], dim=-1)
     norm = torch.where(tgt_norm == 0, 1e-9, tgt_norm * tgt_norm)
     nac_tgt = auto_corr / norm.unsqueeze(1)
     cross_corr = torch.fft.ifft(tgt_f * out_f.conj(), dim=-1).real
-    cross_corr = torch.cat([cross_corr[..., -(T - 1):], cross_corr[..., :T]], dim=-1)
+    cross_corr = torch.cat([cross_corr[..., -(T - 1) :], cross_corr[..., :T]], dim=-1)
     norm2 = torch.where(tgt_norm * out_norm == 0, 1e-9, tgt_norm * out_norm)
     nac_out = cross_corr / (tgt_norm * out_norm).unsqueeze(1)
     return torch.mean(torch.abs(nac_tgt - nac_out), dim=-1)
@@ -564,18 +602,22 @@ def _amp_loss(outputs, targets):
 
 def _ashift_loss(outputs, targets):
     import torch
+
     B, T = outputs.shape
-    return T * torch.mean(torch.abs(1 / T - torch.softmax(outputs - targets, dim=-1)), dim=-1)
+    return T * torch.mean(
+        torch.abs(1 / T - torch.softmax(outputs - targets, dim=-1)), dim=-1
+    )
 
 
 def _phase_loss(outputs, targets):
     import torch
+
     B, T = outputs.shape
     out_f = torch.fft.fft(outputs, dim=-1)
     tgt_f = torch.fft.fft(targets, dim=-1)
-    tgt_f_sq = tgt_f.real ** 2 + tgt_f.imag ** 2
+    tgt_f_sq = tgt_f.real**2 + tgt_f.imag**2
     mask = (tgt_f_sq > T).float()
-    topk_indices = tgt_f_sq.topk(k=int(T ** 0.5), dim=-1).indices
+    topk_indices = tgt_f_sq.topk(k=int(T**0.5), dim=-1).indices
     mask = mask.scatter_(-1, topk_indices, 1.0)
     mask[..., 0] = 1.0
     mask = torch.where(mask > 0, 1.0, 0.0)
@@ -583,12 +625,14 @@ def _phase_loss(outputs, targets):
     not_mask = (~mask).float()
     not_mask /= torch.mean(not_mask, dim=-1).unsqueeze(1)
     zero_error = torch.abs(out_f) * not_mask
-    zero_error = torch.where(torch.isnan(zero_error), torch.zeros_like(zero_error), zero_error)
+    zero_error = torch.where(
+        torch.isnan(zero_error), torch.zeros_like(zero_error), zero_error
+    )
     mask_f = mask.float()
     mask_f /= torch.mean(mask_f, dim=-1).unsqueeze(1)
     ae = torch.abs(out_f - tgt_f) * mask_f
     ae = torch.where(torch.isnan(ae), torch.zeros_like(ae), ae)
-    return (torch.mean(zero_error, dim=-1) + torch.mean(ae, dim=-1)) / (T ** 0.5)
+    return (torch.mean(zero_error, dim=-1) + torch.mean(ae, dim=-1)) / (T**0.5)
 
 
 def _tildeq_loss(target, output):
@@ -604,19 +648,21 @@ def _TILDEQ(outputs, targets, axis=1):
 
 def _derivatives(inp, device="cpu"):
     import torch
+
     batch_size, lens = inp.shape[0:2]
     input2 = inp[:, 2:lens].to(device)
-    input1 = inp[:, 0:lens - 2].to(device)
+    input1 = inp[:, 0 : lens - 2].to(device)
     return input2 - input1
 
 
 def _w_mse(targets, outputs, device="cpu"):
     import torch
+
     batch_size, lens = targets.shape[0:2]
     t1 = targets[:, 1:lens].to(device)
-    t2 = targets[:, 0:lens - 1].to(device)
+    t2 = targets[:, 0 : lens - 1].to(device)
     o1 = outputs[:, 1:lens].to(device)
-    o2 = outputs[:, 0:lens - 1].to(device)
+    o2 = outputs[:, 0 : lens - 1].to(device)
     sigma = torch.tanh((t1 - t2) * (o1 - o2))
     nt = targets[:, 1:lens].to(device)
     no = outputs[:, 1:lens].to(device)
@@ -625,6 +671,7 @@ def _w_mse(targets, outputs, device="cpu"):
 
 def _trend_loss(targets, outputs, alpha=0.5, device="cpu"):
     import torch
+
     sq_error = _w_mse(targets, outputs, device)
     error1 = torch.mean(sq_error, dim=-1)
     x1 = _derivatives(targets, device)
@@ -664,26 +711,41 @@ _METRICS_FORECAST = {
 # ── Frequency token mappings ──────────────────────────────────────────────────
 
 _freq_token_mapping = {
-    "oov": 0, "minutely": 1, "2_minutes": 2, "5_minutes": 3,
-    "10_minutes": 4, "15_minutes": 5, "half_hourly": 6, "hourly": 7,
+    "oov": 0,
+    "minutely": 1,
+    "2_minutes": 2,
+    "5_minutes": 3,
+    "10_minutes": 4,
+    "15_minutes": 5,
+    "half_hourly": 6,
+    "hourly": 7,
 }
 _freq_token_to_minutes = {
-    "oov": None, "minutely": 1, "2_minutes": 2, "5_minutes": 5,
-    "10_minutes": 10, "15_minutes": 15, "half_hourly": 30, "hourly": 60,
+    "oov": None,
+    "minutely": 1,
+    "2_minutes": 2,
+    "5_minutes": 5,
+    "10_minutes": 10,
+    "15_minutes": 15,
+    "half_hourly": 30,
+    "hourly": 60,
 }
 _TSFREQUENCY_TOLERANCE = 0.2
 
 
 # ── TSFM data quality filter ──────────────────────────────────────────────────
 
-def _tsfm_data_quality_filter(df_dataframe, dataset_config_dictionary, model_config, task="inference"):
+
+def _tsfm_data_quality_filter(
+    df_dataframe, dataset_config_dictionary, model_config, task="inference"
+):
     timestamp_col = dataset_config_dictionary["column_specifiers"]["timestamp_column"]
     data_col = [timestamp_col]
     for columns_group in dataset_config_dictionary["column_specifiers"]:
-        print(columns_group)
         if "_columns" in columns_group:
-            print("IN")
-            data_col.extend(dataset_config_dictionary["column_specifiers"][columns_group])
+            data_col.extend(
+                dataset_config_dictionary["column_specifiers"][columns_group]
+            )
     if "operation_on_column" in dataset_config_dictionary:
         data_col.extend(dataset_config_dictionary["operation_on_column"])
 
@@ -702,7 +764,6 @@ def _tsfm_data_quality_filter(df_dataframe, dataset_config_dictionary, model_con
     if "frequency_sampling" in dataset_config_dictionary:
         freq_str = dataset_config_dictionary["frequency_sampling"]
         if freq_str:
-            print(freq_str)
             assert freq_str in _freq_token_to_minutes, (
                 f" frequency_sampling input does not belong to {list(_freq_token_to_minutes.keys())}, "
                 "select 'oov' to estimate it from the timestamps"
@@ -713,20 +774,23 @@ def _tsfm_data_quality_filter(df_dataframe, dataset_config_dictionary, model_con
         timestamps = pd.to_datetime(df[timestamp_col])
         time_diffs = timestamps.diff().dropna()
         frequency_minutes = float(time_diffs.dt.total_seconds().div(60).median())
-        print("Estimated sampling frequency from timestamps:", frequency_minutes, "min")
 
     freq_lower = frequency_minutes - _TSFREQUENCY_TOLERANCE * frequency_minutes
     freq_upper = frequency_minutes + _TSFREQUENCY_TOLERANCE * frequency_minutes
     FILTERING_PARAMS["dt"] = {"lower_bound": freq_lower, "upper_bound": freq_upper}
 
-    df = _dq_timeseries_segmentation(df, filtering_params=FILTERING_PARAMS, timestamp_tag=timestamp_col)
+    df = _dq_timeseries_segmentation(
+        df, filtering_params=FILTERING_PARAMS, timestamp_tag=timestamp_col
+    )
 
     dataset_config = dataset_config_dictionary.copy()
     dataset_config["id_columns"] = ["segment_id"]
     for col_tag in dataset_config["column_specifiers"]:
         if col_tag not in ("timestamp_column", "autoregressive_modeling"):
             dataset_config["column_specifiers"][col_tag] = [
-                c for c in dataset_config["column_specifiers"][col_tag] if c in df.columns
+                c
+                for c in dataset_config["column_specifiers"][col_tag]
+                if c in df.columns
             ]
 
     n_minimum = 1
@@ -736,14 +800,15 @@ def _tsfm_data_quality_filter(df_dataframe, dataset_config_dictionary, model_con
         n_minimum = model_config["prediction_length"] + model_config["context_length"]
 
     group_sizes = df.groupby(dataset_config["id_columns"][0]).size()
-    print("Group sizes:", group_sizes)
     large_groups = group_sizes[group_sizes >= n_minimum].index
     df = df[df[dataset_config["id_columns"][0]].isin(large_groups)]
 
     ts_segments_quality_summary = _time_series_segment_quality_summary(
         df, timestamp_col, dataset_config["id_columns"][0]
     )
-    ts_segments_quality_summary["removed_columns"] = [c for c in data_col if c not in df.columns]
+    ts_segments_quality_summary["removed_columns"] = [
+        c for c in data_col if c not in df.columns
+    ]
     ts_segments_quality_summary["frequency_sampling_min"] = frequency_minutes
 
     df = df.loc[:, ~df.columns.duplicated(keep="first")]
@@ -751,16 +816,24 @@ def _tsfm_data_quality_filter(df_dataframe, dataset_config_dictionary, model_con
     return {
         "data": df,
         "dataset_config_dictionary": dataset_config,
-        "dataquality_summary": _make_json_compatible({
-            "original_data": {"nans_summary": nans_dic, "sampling_summary": time_intervals_dic},
-            "filtered_data_ts_segments": ts_segments_quality_summary,
-        }),
+        "dataquality_summary": _make_json_compatible(
+            {
+                "original_data": {
+                    "nans_summary": nans_dic,
+                    "sampling_summary": time_intervals_dic,
+                },
+                "filtered_data_ts_segments": ts_segments_quality_summary,
+            }
+        ),
     }
 
 
 # ── TSFM inference helpers ────────────────────────────────────────────────────
 
-def _get_gt_and_predictions(trainer, dataset, ix_target_features, inverse_transforms=None):
+
+def _get_gt_and_predictions(
+    trainer, dataset, ix_target_features, inverse_transforms=None
+):
     if inverse_transforms is None:
         inverse_transforms = []
     outputs = trainer.predict(dataset)
@@ -770,12 +843,16 @@ def _get_gt_and_predictions(trainer, dataset, ix_target_features, inverse_transf
     for i in range(len(dataset)):
         aux = dataset[i]["future_values"][:, ix_target_features].detach().numpy()
         if "timestamp" in dataset[i]:
-            timestamp_id_value_dic.setdefault("timestamp", []).append(dataset[i]["timestamp"])
+            timestamp_id_value_dic.setdefault("timestamp", []).append(
+                dataset[i]["timestamp"]
+            )
         if "id" in dataset[i]:
             timestamp_id_value_dic.setdefault("id", []).extend(list(dataset[i]["id"]))
         target_value_list.append(aux)
         forecast_h = aux.shape[0]
-        aux_pred = outputs.predictions[0][i, :forecast_h, ix_target_features].transpose()
+        aux_pred = outputs.predictions[0][
+            i, :forecast_h, ix_target_features
+        ].transpose()
         pred_value_list.append(aux_pred)
     y_gt = np.array(target_value_list)
     y_pred = np.array(pred_value_list)
@@ -786,7 +863,14 @@ def _get_gt_and_predictions(trainer, dataset, ix_target_features, inverse_transf
     return y_gt, y_pred, timestamp_id_value_dic
 
 
-def _get_performance(y_gt, y_pred, target_columns=None, prediction=True, inverse_transforms=None, ts_mask=None):
+def _get_performance(
+    y_gt,
+    y_pred,
+    target_columns=None,
+    prediction=True,
+    inverse_transforms=None,
+    ts_mask=None,
+):
     if inverse_transforms is None:
         inverse_transforms = []
     if ts_mask is None:
@@ -805,13 +889,15 @@ def _get_performance(y_gt, y_pred, target_columns=None, prediction=True, inverse
                 y_pred[:, ix_fhorizon, ix_target] = inverse_transforms[ix_target](
                     y_pred[:, ix_fhorizon, ix_target][:, np.newaxis]
                 )[:, 0]
-            pd_aux = pd.DataFrame({
-                "y_gt": y_gt[:, ix_fhorizon, ix_target],
-                "y_pred": y_pred[:, ix_fhorizon, ix_target],
-                "forecast_horizon": ix_fhorizon + 1,
-                "target": target_columns[ix_target],
-                "on_mask": ts_mask[:, ix_fhorizon],
-            })
+            pd_aux = pd.DataFrame(
+                {
+                    "y_gt": y_gt[:, ix_fhorizon, ix_target],
+                    "y_pred": y_pred[:, ix_fhorizon, ix_target],
+                    "forecast_horizon": ix_fhorizon + 1,
+                    "target": target_columns[ix_target],
+                    "on_mask": ts_mask[:, ix_fhorizon],
+                }
+            )
             pd_prediction = pd.concat([pd_prediction, pd_aux], axis=0)
             y_gt_mask = y_gt[:, ix_fhorizon, ix_target][ts_mask[:, ix_fhorizon] > 0]
             y_pred_mask = y_pred[:, ix_fhorizon, ix_target][ts_mask[:, ix_fhorizon] > 0]
@@ -826,20 +912,33 @@ def _get_performance(y_gt, y_pred, target_columns=None, prediction=True, inverse
                         axis=1,
                     )
                     stat = np.mean(value) if value is not None else None
-                    rows.append([target_columns[ix_target], ix_fhorizon + 1, metric, stat])
+                    rows.append(
+                        [target_columns[ix_target], ix_fhorizon + 1, metric, stat]
+                    )
     if rows:
-        pd_performance = pd.DataFrame(data=rows, columns=["target", "forecast", "metric", "value"])
+        pd_performance = pd.DataFrame(
+            data=rows, columns=["target", "forecast", "metric", "value"]
+        )
     if prediction:
         return pd_performance, pd_prediction
     return pd_performance
 
 
 def _get_ttm_hf_inference(
-    df_dataframe, dataset_config_dictionary, model_config, model_checkpoint,
-    scaling=False, tsp=None, forecast_horizon=-1
+    df_dataframe,
+    dataset_config_dictionary,
+    model_config,
+    model_checkpoint,
+    scaling=False,
+    tsp=None,
+    forecast_horizon=-1,
 ):
     from tsfm_public import TinyTimeMixerForPrediction
-    from tsfm_public.toolkit.time_series_preprocessor import TimeSeriesPreprocessor, get_datasets, create_timestamps
+    from tsfm_public.toolkit.time_series_preprocessor import (
+        TimeSeriesPreprocessor,
+        get_datasets,
+        create_timestamps,
+    )
     from transformers import Trainer, TrainingArguments
 
     if forecast_horizon == -1:
@@ -850,11 +949,15 @@ def _get_ttm_hf_inference(
             f"Set a forecast horizon smaller than {model_config['prediction_length']}"
         )
     context_length = model_config["context_length"]
-    print("Model Config:", model_config)
-    assert context_length <= len(df_dataframe), " length of dataframe needs to be larger or equal to context length"
+    assert context_length <= len(df_dataframe), (
+        " length of dataframe needs to be larger or equal to context length"
+    )
 
     column_specifiers = dataset_config_dictionary["column_specifiers"]
-    if "id_columns" in dataset_config_dictionary and "id_columns" not in column_specifiers:
+    if (
+        "id_columns" in dataset_config_dictionary
+        and "id_columns" not in column_specifiers
+    ):
         column_specifiers["id_columns"] = dataset_config_dictionary["id_columns"]
 
     encode_categorical = False
@@ -865,23 +968,32 @@ def _get_ttm_hf_inference(
         prediction_length=forecast_horizon,
         context_length=context_length,
     )
-    dataset_dic = get_datasets(tsp, df_dataframe, split_config={"train": 1.0, "test": 0.0}, use_frequency_token=True)
+    dataset_dic = get_datasets(
+        tsp,
+        df_dataframe,
+        split_config={"train": 1.0, "test": 0.0},
+        use_frequency_token=True,
+    )
     dataset_inference = dataset_dic[0]
 
-    model = TinyTimeMixerForPrediction.from_pretrained(model_checkpoint, prediction_filter_length=forecast_horizon)
+    model = TinyTimeMixerForPrediction.from_pretrained(
+        model_checkpoint, prediction_filter_length=forecast_horizon
+    )
     args = TrainingArguments(output_dir="./output", logging_dir="./log")
     trainer = Trainer(model=model, args=args, eval_dataset=dataset_inference)
 
-    ix_target_features = list(np.arange(len(dataset_config_dictionary["column_specifiers"]["target_columns"])))
+    ix_target_features = list(
+        np.arange(len(dataset_config_dictionary["column_specifiers"]["target_columns"]))
+    )
 
-    print("PREDICTING!")
     outputs = trainer.predict(dataset_inference)
-    print("END PREDICTION!")
     y_pred = outputs.predictions[0][:, :forecast_horizon, ix_target_features]
 
     if tsp.scaling:
         for ixf in range(y_pred.shape[1]):
-            y_pred[:, ixf, :] = tsp.target_scaler_dict["0"].inverse_transform(y_pred[:, ixf, :])
+            y_pred[:, ixf, :] = tsp.target_scaler_dict["0"].inverse_transform(
+                y_pred[:, ixf, :]
+            )
 
     timestamps_list = []
     timestamps_prediction_list = []
@@ -890,32 +1002,36 @@ def _get_ttm_hf_inference(
             timestamps_list.append(dataset_inference[i]["timestamp"])
             timestamp_forecast = create_timestamps(
                 last_timestamp=dataset_inference[i]["timestamp"],
-                time_sequence=df_dataframe[column_specifiers["timestamp_column"]].values,
+                time_sequence=df_dataframe[
+                    column_specifiers["timestamp_column"]
+                ].values,
                 periods=forecast_horizon,
             )
             timestamps_prediction_list.append(timestamp_forecast)
 
     output: dict = {
-        "target_columns": dataset_config_dictionary["column_specifiers"]["target_columns"],
+        "target_columns": dataset_config_dictionary["column_specifiers"][
+            "target_columns"
+        ],
         "target_prediction": y_pred,
         "timestamp": timestamps_list,
         "timestamp_prediction": timestamps_prediction_list,
     }
 
     inverse_transforms = []
-    print(ix_target_features)
-    print(tsp)
     if scaling:
         inverse_transforms.append(tsp.target_scaler_dict["0"].inverse_transform)
 
     y_gt, y_pred_eval, timestamp_id_value_dic = _get_gt_and_predictions(
-        trainer, dataset_inference, ix_target_features=ix_target_features, inverse_transforms=inverse_transforms
+        trainer,
+        dataset_inference,
+        ix_target_features=ix_target_features,
+        inverse_transforms=inverse_transforms,
     )
-    print("GET", y_gt.shape, y_pred_eval.shape)
     target_columns = dataset_config_dictionary["column_specifiers"]["target_columns"]
-    pd_performance = _get_performance(y_gt, y_pred_eval, target_columns=target_columns, prediction=False)
-    print("Performance:")
-    print(pd_performance.loc[pd_performance["forecast"] == forecast_horizon])
+    pd_performance = _get_performance(
+        y_gt, y_pred_eval, target_columns=target_columns, prediction=False
+    )
     output["performance"] = pd_performance
 
     return output
@@ -966,12 +1082,26 @@ def _ttm_main_config():
 
 
 def _finetune_ttm_hf(
-    df_dataframe, dataset_config_dictionary, model_config, save_model_dir,
-    n_finetune, n_calibration, n_test, model_checkpoint="", training_config_dic=None,
+    df_dataframe,
+    dataset_config_dictionary,
+    model_config,
+    save_model_dir,
+    n_finetune,
+    n_calibration,
+    n_test,
+    model_checkpoint="",
+    training_config_dic=None,
 ):
-    from tsfm_public import TinyTimeMixerConfig, TinyTimeMixerForPrediction, TrackingCallback
+    from tsfm_public import (
+        TinyTimeMixerConfig,
+        TinyTimeMixerForPrediction,
+        TrackingCallback,
+    )
     from tsfm_public.toolkit.lr_finder import optimal_lr_finder
-    from tsfm_public.toolkit.time_series_preprocessor import TimeSeriesPreprocessor, get_datasets
+    from tsfm_public.toolkit.time_series_preprocessor import (
+        TimeSeriesPreprocessor,
+        get_datasets,
+    )
     from tsfm_public.toolkit.util import select_by_index
     from transformers import Trainer, TrainingArguments, EarlyStoppingCallback, set_seed
 
@@ -984,25 +1114,28 @@ def _finetune_ttm_hf(
             if k not in args_config_dic:
                 args_config_dic[k] = default_config[k]
 
-    print("FINETUNING ARGUMENTS::", args_config_dic)
     seed = args_config_dic["seed"]
     set_seed(seed)
     encode_categorical = args_config_dic["encode_categorical"]
     scaling_type = args_config_dic["scaling"]
     p_validation = args_config_dic["p_validation"]
-    print("SCALING ::", scaling_type)
 
     forecast_horizon = model_config["prediction_length"]
     context_length = model_config["context_length"]
     args_config_dic["forecast_horizon"] = forecast_horizon
     args_config_dic["context_length"] = context_length
 
-    assert context_length <= len(df_dataframe), " length of dataframe needs to be >= context length"
+    assert context_length <= len(df_dataframe), (
+        " length of dataframe needs to be >= context length"
+    )
 
     column_specifiers = dataset_config_dictionary["column_specifiers"]
     ix_target_features = list(np.arange(len(column_specifiers["target_columns"])))
 
-    if "id_columns" in dataset_config_dictionary and "id_columns" not in column_specifiers:
+    if (
+        "id_columns" in dataset_config_dictionary
+        and "id_columns" not in column_specifiers
+    ):
         column_specifiers["id_columns"] = dataset_config_dictionary["id_columns"]
 
     n_data = len(df_dataframe)
@@ -1017,8 +1150,7 @@ def _finetune_ttm_hf(
     n_train_effective = p_finetune * n_train_total - n_validation
     fewshot_fraction = n_train_effective / (n_train_total - n_validation)
 
-    scaling = (scaling_type == "standard")
-    print("FINETUNING SCALING ::", scaling)
+    scaling = scaling_type == "standard"
 
     tsp = TimeSeriesPreprocessor(
         **column_specifiers,
@@ -1028,7 +1160,8 @@ def _finetune_ttm_hf(
         context_length=context_length,
     )
     dataset_dic = get_datasets(
-        tsp, df_dataframe,
+        tsp,
+        df_dataframe,
         split_config={"train": p_train, "test": p_test},
         use_frequency_token=True,
         fewshot_fraction=fewshot_fraction,
@@ -1036,19 +1169,13 @@ def _finetune_ttm_hf(
     train_dataset = dataset_dic[0]
     valid_dataset = dataset_dic[1]
     test_dataset = dataset_dic[2]
-    print("Train Dataset Size:", len(train_dataset))
-    print("Validation Dataset Size:", len(valid_dataset))
-    print("Test Dataset Size:", len(test_dataset))
 
-    print("ARGS CONFIG FILE ::", args_config_dic)
-    print(save_model_dir)
     with open(os.path.join(save_model_dir, "args_config.yml"), "w") as outfile:
         yaml.dump(args_config_dic, outfile)
-    pickle.dump(tsp, open(os.path.join(save_model_dir, "tsp.pickle"), "wb"))
+    with open(os.path.join(save_model_dir, "tsp.pickle"), "wb") as _f:
+        pickle.dump(tsp, _f)
 
-    print("DECODER MODE ::", args_config_dic["decoder_mode"])
     if os.path.exists(model_checkpoint):
-        print("Loading model from:", model_checkpoint)
         finetune_forecast_model = TinyTimeMixerForPrediction.from_pretrained(
             model_checkpoint,
             head_dropout=args_config_dic["head_dropout"],
@@ -1063,26 +1190,24 @@ def _finetune_ttm_hf(
         )
     else:
         config_ttm_dic = model_config.copy()
-        config_ttm_dic.update({
-            "head_dropout": args_config_dic["head_dropout"],
-            "prediction_length": forecast_horizon,
-            "num_input_channels": tsp.num_input_channels,
-            "exogenous_channel_indices": tsp.exogenous_channel_indices,
-            "prediction_channel_indices": tsp.prediction_channel_indices,
-            "enable_forecast_channel_mixing": False,
-            "fcm_use_mixer": False,
-            "decoder_mode": args_config_dic["decoder_mode"],
-        })
+        config_ttm_dic.update(
+            {
+                "head_dropout": args_config_dic["head_dropout"],
+                "prediction_length": forecast_horizon,
+                "num_input_channels": tsp.num_input_channels,
+                "exogenous_channel_indices": tsp.exogenous_channel_indices,
+                "prediction_channel_indices": tsp.prediction_channel_indices,
+                "enable_forecast_channel_mixing": False,
+                "fcm_use_mixer": False,
+                "decoder_mode": args_config_dic["decoder_mode"],
+            }
+        )
         config = TinyTimeMixerConfig(**config_ttm_dic)
         finetune_forecast_model = TinyTimeMixerForPrediction(config)
 
     if args_config_dic["backbone_frozen"]:
-        print(" BACKBONE FROZEN !!!")
         for param in finetune_forecast_model.backbone.parameters():
             param.requires_grad = False
-
-    print("CONFIG MODEL::")
-    print(finetune_forecast_model.config)
 
     batch_size = args_config_dic["batch_size"]
     epochs = args_config_dic["epochs"]
@@ -1102,21 +1227,21 @@ def _finetune_ttm_hf(
     os.makedirs(output_fewshot_dir, exist_ok=True)
     os.makedirs(logging_dir, exist_ok=True)
 
-    training_config_dictionary.update({
-        "per_device_train_batch_size": batch_size,
-        "per_device_eval_batch_size": batch_size,
-        "num_train_epochs": epochs,
-        "learning_rate": lr,
-        "output_dir": output_fewshot_dir,
-        "logging_dir": logging_dir,
-        "dataloader_num_workers": num_workers,
-    })
+    training_config_dictionary.update(
+        {
+            "per_device_train_batch_size": batch_size,
+            "per_device_eval_batch_size": batch_size,
+            "num_train_epochs": epochs,
+            "learning_rate": lr,
+            "output_dir": output_fewshot_dir,
+            "logging_dir": logging_dir,
+            "dataloader_num_workers": num_workers,
+        }
+    )
     if epochs_warmup > 0:
         training_config_dictionary["warmup_steps"] = math.ceil(
             epochs_warmup * len(train_dataset) / batch_size
         )
-    print("Training Config Dictionary:")
-    print(training_config_dictionary)
     with open(os.path.join(save_model_dir, "training_config.yml"), "w") as outfile:
         yaml.dump(training_config_dictionary, outfile)
 
@@ -1128,12 +1253,10 @@ def _finetune_ttm_hf(
                 lr, finetune_forecast_model = optimal_lr_finder(
                     finetune_forecast_model, train_dataset, batch_size=batch_size
                 )
-                print("OPTIMAL SUGGESTED LEARNING RATE =", lr)
                 if lr <= 0:
                     lr = 0.0001
             except Exception:
                 lr = 0.0001
-                print("USING LEARNING RATE =", lr)
     else:
         lr = 0.0001
 
@@ -1145,27 +1268,33 @@ def _finetune_ttm_hf(
     optimizer = None
     if optim == "AdamW":
         from torch.optim import AdamW
+
         optimizer = AdamW(finetune_forecast_model.parameters(), lr=lr)
 
     scheduler_object = None
     if scheduler == "cosine_with_warmup":
         if optimizer is None:
             from torch.optim import AdamW
+
             optimizer = AdamW(finetune_forecast_model.parameters(), lr=lr)
         from transformers.optimization import get_cosine_schedule_with_warmup
+
         total_steps = math.ceil(len(train_dataset) * epochs / batch_size)
         num_warmup_steps = math.ceil(epochs_warmup * len(train_dataset) / batch_size)
         scheduler_object = get_cosine_schedule_with_warmup(
             optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=total_steps
         )
-    print(" SCHEDULER ::", scheduler)
     if scheduler == "OneCycleLR":
         if optimizer is None:
             from torch.optim import AdamW
+
             optimizer = AdamW(finetune_forecast_model.parameters(), lr=lr)
         from torch.optim.lr_scheduler import OneCycleLR
+
         scheduler_object = OneCycleLR(
-            optimizer, lr, epochs=epochs,
+            optimizer,
+            lr,
+            epochs=epochs,
             steps_per_epoch=math.ceil(len(train_dataset) / batch_size),
         )
 
@@ -1195,14 +1324,21 @@ def _finetune_ttm_hf(
     for dataset_key in dataset_eval:
         inverse_transforms_eval = []
         if scaling:
-            inverse_transforms_eval.append(tsp.target_scaler_dict["0"].inverse_transform)
+            inverse_transforms_eval.append(
+                tsp.target_scaler_dict["0"].inverse_transform
+            )
         y_gt, y_pred_eval, _ = _get_gt_and_predictions(
-            finetune_forecast_trainer, dataset_eval[dataset_key],
+            finetune_forecast_trainer,
+            dataset_eval[dataset_key],
             ix_target_features=ix_target_features,
             inverse_transforms=inverse_transforms_eval,
         )
-        target_columns = dataset_config_dictionary["column_specifiers"]["target_columns"]
-        pd_performance_i = _get_performance(y_gt, y_pred_eval, target_columns=target_columns, prediction=False)
+        target_columns = dataset_config_dictionary["column_specifiers"][
+            "target_columns"
+        ]
+        pd_performance_i = _get_performance(
+            y_gt, y_pred_eval, target_columns=target_columns, prediction=False
+        )
         pd_performance_i["split"] = dataset_key
         pd_performance = pd.concat([pd_performance, pd_performance_i], axis=0)
 
@@ -1232,14 +1368,18 @@ _NONCONFORMITY_SCORES = ["absolute_error"]
 
 
 def _absolute_error(y, y_pred):
-    assert y.shape == y_pred.shape, f"y and y_pred shapes do not match: {y.shape} vs {y_pred.shape}"
+    assert y.shape == y_pred.shape, (
+        f"y and y_pred shapes do not match: {y.shape} vs {y_pred.shape}"
+    )
     error = np.abs(y - y_pred)
     if len(error.shape) > 1:
         error = np.mean(error, axis=-1)
     return error
 
 
-def _nonconformity_score_functions(y_pred, y_gt, X=None, nonconformity_score="absolute_error"):
+def _nonconformity_score_functions(
+    y_pred, y_gt, X=None, nonconformity_score="absolute_error"
+):
     assert nonconformity_score in _NONCONFORMITY_SCORES
     if nonconformity_score == "absolute_error":
         return _absolute_error(y_gt, y_pred)
@@ -1250,7 +1390,9 @@ def _conformal_set(y_pred, score_threshold, nonconformity_score="absolute_error"
         return {"y_low": y_pred - score_threshold, "y_high": y_pred + score_threshold}
 
 
-def _weighted_conformal_quantile(scores, weights, alpha=0.05, conformal_correction=False, max_score=np.inf):
+def _weighted_conformal_quantile(
+    scores, weights, alpha=0.05, conformal_correction=False, max_score=np.inf
+):
     if weights is None:
         weights = np.ones_like(scores)
     assert np.max(weights) <= 1
@@ -1268,7 +1410,9 @@ def _weighted_conformal_quantile(scores, weights, alpha=0.05, conformal_correcti
     return sorted_scores[quantile_index]
 
 
-def _weighted_conformal_alpha(scores, weights, score_observed, conformal_correction=False, max_score=np.inf):
+def _weighted_conformal_alpha(
+    scores, weights, score_observed, conformal_correction=False, max_score=np.inf
+):
     if weights is None:
         weights = np.ones_like(score_observed)
     if conformal_correction:
@@ -1283,9 +1427,14 @@ def _weighted_conformal_alpha(scores, weights, score_observed, conformal_correct
 
 class _TSADWeightedConformalWrapper:
     def __init__(
-        self, nonconformity_score="absolute_error", false_alarm=0.05,
-        weighting="uniform", weighting_params=None, threshold_function="weighting",
-        window_size=None, online_adaptive=False,
+        self,
+        nonconformity_score="absolute_error",
+        false_alarm=0.05,
+        weighting="uniform",
+        weighting_params=None,
+        threshold_function="weighting",
+        window_size=None,
+        online_adaptive=False,
     ):
         if weighting_params is None:
             weighting_params = {}
@@ -1312,16 +1461,18 @@ class _TSADWeightedConformalWrapper:
         self.cal_scores = _nonconformity_score_functions(
             y_cal_pred, y_cal_gt, X=X_cal, nonconformity_score=self.nonconformity_score
         )
-        self.cal_scores = self.cal_scores[-self.window_size:]
+        self.cal_scores = self.cal_scores[-self.window_size :]
         if X_cal is not None:
-            self.cal_X = X_cal[-self.window_size:]
+            self.cal_X = X_cal[-self.window_size :]
         if cal_timestamps is not None:
-            self.cal_timestamps = cal_timestamps[-self.window_size:]
+            self.cal_timestamps = cal_timestamps[-self.window_size :]
         if self.weighting in ("uniform", "exponential_decay"):
             cal_weights = self.get_weights()
             self.weights.append(cal_weights)
             if self.threshold_function == "weighting":
-                self.score_threshold = self._score_threshold_func(cal_weights, false_alarm=self.false_alarm)
+                self.score_threshold = self._score_threshold_func(
+                    cal_weights, false_alarm=self.false_alarm
+                )
         critical_efficient_size = np.ceil(1 / self.false_alarm)
         assert np.sum(cal_weights) >= critical_efficient_size, (
             f" The effective size is too small for the desired false alarm of {self.false_alarm}, "
@@ -1340,7 +1491,15 @@ class _TSADWeightedConformalWrapper:
                 decay_param = self.weighting_params.get("decay_param", 0.99)
                 return decay_param ** (self.window_size - np.arange(self.window_size))
 
-    def _score_threshold_func(self, cal_weights, cal_scores=None, y_pred=None, X=None, timestamps=None, false_alarm=None):
+    def _score_threshold_func(
+        self,
+        cal_weights,
+        cal_scores=None,
+        y_pred=None,
+        X=None,
+        timestamps=None,
+        false_alarm=None,
+    ):
         if cal_scores is None:
             cal_scores = self.cal_scores
         if false_alarm is None:
@@ -1364,21 +1523,38 @@ class _TSADWeightedConformalWrapper:
                 score_threshold = np.array(score_threshold)
         return score_threshold
 
-    def predict_batch(self, y_pred, y_gt=None, X=None, timestamps=None, false_alarm=None, update=None):
+    def predict_batch(
+        self, y_pred, y_gt=None, X=None, timestamps=None, false_alarm=None, update=None
+    ):
         if false_alarm is None:
             false_alarm = self.false_alarm
         if update is None:
             update = self.online
-        cal_weights = self.get_weights(y_pred, X=X, timestamps=timestamps, false_alarm=false_alarm)
-        if (false_alarm == self.false_alarm and self.weighting in ("uniform",) and
-                self.threshold_function in ("weighting",)):
+        cal_weights = self.get_weights(
+            y_pred, X=X, timestamps=timestamps, false_alarm=false_alarm
+        )
+        if (
+            false_alarm == self.false_alarm
+            and self.weighting in ("uniform",)
+            and self.threshold_function in ("weighting",)
+        ):
             score_threshold = self.score_threshold
         else:
-            score_threshold = self._score_threshold_func(cal_weights, y_pred=y_pred, X=X, timestamps=timestamps, false_alarm=false_alarm)
-        prediction_interval = _conformal_set(y_pred, score_threshold, nonconformity_score=self.nonconformity_score)
+            score_threshold = self._score_threshold_func(
+                cal_weights,
+                y_pred=y_pred,
+                X=X,
+                timestamps=timestamps,
+                false_alarm=false_alarm,
+            )
+        prediction_interval = _conformal_set(
+            y_pred, score_threshold, nonconformity_score=self.nonconformity_score
+        )
         output: dict = {}
         if y_gt is not None:
-            test_scores = _nonconformity_score_functions(y_pred, y_gt, X=X, nonconformity_score=self.nonconformity_score)
+            test_scores = _nonconformity_score_functions(
+                y_pred, y_gt, X=X, nonconformity_score=self.nonconformity_score
+            )
             test_outliers = np.array(test_scores > score_threshold).astype("int")
             test_ad_scores = [
                 _weighted_conformal_alpha(
@@ -1395,7 +1571,9 @@ class _TSADWeightedConformalWrapper:
         output["prediction_interval"] = prediction_interval
         return output
 
-    def predict(self, y_pred, y_gt=None, X=None, timestamps=None, false_alarm=None, update=None):
+    def predict(
+        self, y_pred, y_gt=None, X=None, timestamps=None, false_alarm=None, update=None
+    ):
         if false_alarm is None:
             false_alarm = self.false_alarm
         if update is None:
@@ -1406,57 +1584,88 @@ class _TSADWeightedConformalWrapper:
             output = None
             for ix_b in range(n_batches):
                 ix_ini = int(ix_b * self.online_size)
-                ix_end = min(int(ix_b * self.online_size + self.online_size), y_pred.shape[0])
+                ix_end = min(
+                    int(ix_b * self.online_size + self.online_size), y_pred.shape[0]
+                )
                 y_pred_b = y_pred[ix_ini:ix_end]
                 y_gt_b = y_gt[ix_ini:ix_end]
                 X_b = X[ix_ini:ix_end] if X is not None else None
                 ts_b = timestamps[ix_ini:ix_end] if timestamps is not None else None
-                output_b = self.predict_batch(y_pred_b, y_gt=y_gt_b, X=X_b, timestamps=ts_b, false_alarm=false_alarm, update=update)
+                output_b = self.predict_batch(
+                    y_pred_b,
+                    y_gt=y_gt_b,
+                    X=X_b,
+                    timestamps=ts_b,
+                    false_alarm=false_alarm,
+                    update=update,
+                )
                 if output is None:
                     output = output_b.copy()
                 else:
                     for k in output_b:
                         if k == "prediction_interval":
                             for k2 in output_b[k]:
-                                output[k][k2] = np.append(output[k][k2], np.array(output_b[k][k2]), axis=0)
+                                output[k][k2] = np.append(
+                                    output[k][k2], np.array(output_b[k][k2]), axis=0
+                                )
                         else:
-                            output[k] = np.append(output[k], np.array(output_b[k]), axis=0)
+                            output[k] = np.append(
+                                output[k], np.array(output_b[k]), axis=0
+                            )
         else:
-            output = self.predict_batch(y_pred, y_gt=y_gt, X=X, timestamps=timestamps, false_alarm=false_alarm, update=update)
+            output = self.predict_batch(
+                y_pred,
+                y_gt=y_gt,
+                X=X,
+                timestamps=timestamps,
+                false_alarm=false_alarm,
+                update=update,
+            )
         return output
 
     def update(self, scores, X=None, timestamps=None):
         self.cal_scores = np.append(self.cal_scores, scores, axis=0)
-        self.cal_scores = self.cal_scores[-self.window_size:]
+        self.cal_scores = self.cal_scores[-self.window_size :]
         if timestamps is not None:
             self.cal_timestamps.extend(timestamps)
-            self.cal_timestamps = self.cal_timestamps[-self.window_size:]
+            self.cal_timestamps = self.cal_timestamps[-self.window_size :]
         if X is not None:
             self.cal_X = np.append(self.cal_X, X, axis=0)
-            self.cal_X = self.cal_X[-self.window_size:]
+            self.cal_X = self.cal_X[-self.window_size :]
         if self.weighting == "uniform":
             cal_weights = self.get_weights()
             if self.threshold_function == "weighting":
-                self.score_threshold = self._score_threshold_func(cal_weights, false_alarm=self.false_alarm)
+                self.score_threshold = self._score_threshold_func(
+                    cal_weights, false_alarm=self.false_alarm
+                )
 
 
 # ── TSAD data alignment ───────────────────────────────────────────────────────
 
-def _get_tsfm_dataloaders(df_dataframe, model_config, dataset_config_dictionary, scaling=False):
+
+def _get_tsfm_dataloaders(
+    df_dataframe, model_config, dataset_config_dictionary, scaling=False
+):
     from tsfm_public.toolkit.dataset import ForecastDFDataset
     from tsfm_public.toolkit.time_series_preprocessor import TimeSeriesPreprocessor
     from tsfm_public.toolkit.util import select_by_index
 
     forecast_horizon = model_config["prediction_length"]
     context_length = model_config["context_length"]
-    assert context_length <= len(df_dataframe), " length of dataframe needs to be >= context length"
+    assert context_length <= len(df_dataframe), (
+        " length of dataframe needs to be >= context length"
+    )
 
     column_specifiers = dataset_config_dictionary["column_specifiers"]
     id_columns = dataset_config_dictionary.get("id_columns", [])
 
-    data = select_by_index(df_dataframe, id_columns=[], start_index=0, end_index=len(df_dataframe))
+    data = select_by_index(
+        df_dataframe, id_columns=[], start_index=0, end_index=len(df_dataframe)
+    )
 
-    tsp = TimeSeriesPreprocessor(**column_specifiers, scaling=scaling, encode_categorical=False)
+    tsp = TimeSeriesPreprocessor(
+        **column_specifiers, scaling=scaling, encode_categorical=False
+    )
     tsp = tsp.train(data)
 
     dataset_inference = ForecastDFDataset(
@@ -1469,45 +1678,63 @@ def _get_tsfm_dataloaders(df_dataframe, model_config, dataset_config_dictionary,
     return dataset_inference
 
 
-def _tsfm_dataloader_to_array(dataset_calibration, ix_target_features, x_context_window=-1):
+def _tsfm_dataloader_to_array(
+    dataset_calibration, ix_target_features, x_context_window=-1
+):
     y_gt = []
     X = []
     timestamp_id_value_dic: dict = {}
     for i in range(len(dataset_calibration)):
         try:
-            y_gt.append(dataset_calibration[i]["future_values"][:, ix_target_features].detach().numpy())
+            y_gt.append(
+                dataset_calibration[i]["future_values"][:, ix_target_features]
+                .detach()
+                .numpy()
+            )
         except Exception as ex:
-            raise ValueError(f"At least one of the target_columns is not in the input file: {ix_target_features}") from ex
+            raise ValueError(
+                f"At least one of the target_columns is not in the input file: {ix_target_features}"
+            ) from ex
         X.append(dataset_calibration[i]["past_values"].detach().numpy())
         if "timestamp" in dataset_calibration[i]:
-            timestamp_id_value_dic.setdefault("timestamp", []).append(dataset_calibration[i]["timestamp"])
+            timestamp_id_value_dic.setdefault("timestamp", []).append(
+                dataset_calibration[i]["timestamp"]
+            )
         if "id" in dataset_calibration[i]:
-            timestamp_id_value_dic.setdefault("id", []).extend(list(dataset_calibration[i]["id"]))
+            timestamp_id_value_dic.setdefault("id", []).extend(
+                list(dataset_calibration[i]["id"])
+            )
     y_gt_arr = np.array(y_gt)
     if len(y_gt_arr.shape) > 1:
         y_gt_arr = y_gt_arr[:, 0]
     y_gt_arr = np.squeeze(y_gt_arr)
     X_arr = np.array(X)
     if x_context_window > 0:
-        X_arr = X_arr[:, -int(x_context_window):, :]
+        X_arr = X_arr[:, -int(x_context_window) :, :]
     X_arr = X_arr.reshape([X_arr.shape[0], -1])
     return X_arr, y_gt_arr, timestamp_id_value_dic
 
 
-def _get_tsad_aligned_data(df_data, dataset_config, ad_config, tsmodel_prediction_dictionary):
+def _get_tsad_aligned_data(
+    df_data, dataset_config, ad_config, tsmodel_prediction_dictionary
+):
     from tsfm_public.toolkit.time_series_preprocessor import create_timestamps
 
     context_length = ad_config["context_length"]
     prediction_length = ad_config["prediction_length"]
     scaling = ad_config["scaling"]
-    ix_target_features = list(np.arange(len(dataset_config["column_specifiers"]["target_columns"])))
+    ix_target_features = list(
+        np.arange(len(dataset_config["column_specifiers"]["target_columns"]))
+    )
 
     df_data[dataset_config["column_specifiers"]["timestamp_column"]] = pd.to_datetime(
         df_data[dataset_config["column_specifiers"]["timestamp_column"]]
     )
     dataset_inference = _get_tsfm_dataloaders(
-        df_data, {"prediction_length": prediction_length, "context_length": context_length},
-        dataset_config, scaling=scaling,
+        df_data,
+        {"prediction_length": prediction_length, "context_length": context_length},
+        dataset_config,
+        scaling=scaling,
     )
     X, y_gt, timestamp_id_value_dic = _tsfm_dataloader_to_array(
         dataset_inference, ix_target_features, x_context_window=context_length
@@ -1515,8 +1742,6 @@ def _get_tsad_aligned_data(df_data, dataset_config, ad_config, tsmodel_predictio
 
     source_timestamp = np.array(tsmodel_prediction_dictionary["timestamp"])[:, 0]
     target_timestamp = timestamp_id_value_dic["timestamp"]
-    print(target_timestamp[0], target_timestamp[-1])
-    print(source_timestamp[0], source_timestamp[-1])
 
     forecast_horizon = 1
     target_timestamp_updated = []
@@ -1527,26 +1752,34 @@ def _get_tsad_aligned_data(df_data, dataset_config, ad_config, tsmodel_predictio
             periods=forecast_horizon,
         )[0]
         target_timestamp_updated.append(ts_updated)
-    target_timestamp = np.array(np.array(target_timestamp_updated, dtype="datetime64[ns]"))
+    target_timestamp = np.array(
+        np.array(target_timestamp_updated, dtype="datetime64[ns]")
+    )
     source_timestamp = np.array(np.array(source_timestamp, dtype="datetime64[ns]"))
-
-    print(target_timestamp[0], target_timestamp[-1])
-    print(source_timestamp[0], source_timestamp[-1])
 
     frequency_sampling_median = np.median(target_timestamp[1:] - target_timestamp[:-1])
     tolerance_frequency_sampling = 0.2
 
     time_diff = np.abs(target_timestamp[:, None] - source_timestamp)
-    matching_pairs = np.where(time_diff <= frequency_sampling_median * tolerance_frequency_sampling)
+    matching_pairs = np.where(
+        time_diff <= frequency_sampling_median * tolerance_frequency_sampling
+    )
     index_timestamp = matching_pairs[0]
     index_timestamp_source = matching_pairs[1]
 
     X_cp = X[index_timestamp]
     y_gt_cp = y_gt[index_timestamp]
-    y_pred = np.array(tsmodel_prediction_dictionary["target_prediction"])[index_timestamp_source, 0, 0]
+    y_pred = np.array(tsmodel_prediction_dictionary["target_prediction"])[
+        index_timestamp_source, 0, 0
+    ]
     timestamps_source = np.array(source_timestamp)[index_timestamp_source]
 
-    return {"X": X_cp, "y_gt": y_gt_cp, "y_pred": y_pred, "timestamp": timestamps_source}
+    return {
+        "X": X_cp,
+        "y_gt": y_gt_cp,
+        "y_pred": y_pred,
+        "timestamp": timestamps_source,
+    }
 
 
 # ── TSAD orchestration ────────────────────────────────────────────────────────
@@ -1580,39 +1813,45 @@ class _TimeSeriesAnomalyDetectionConformalWrapper:
             if os.path.exists(ad_model_checkpoint):
                 assert os.path.exists(ad_model_checkpoint + "/model.pkl")
                 assert os.path.exists(ad_model_checkpoint + "/config.json")
-                ad_model = pickle.load(open(ad_model_checkpoint + "/model.pkl", "rb"))
-                ad_config = json.load(open(ad_model_checkpoint + "/config.json", "r"))
+                with open(ad_model_checkpoint + "/model.pkl", "rb") as _f:
+                    ad_model = pickle.load(_f)
+                with open(ad_model_checkpoint + "/config.json") as _f:
+                    ad_config = json.load(_f)
                 ad_model_type = ad_config["ad_model_type"]
                 context_length = ad_config["context_length"]
                 if false_alarm is None:
                     false_alarm = ad_config["false_alarm"]
                 elif ad_config["false_alarm"] != false_alarm:
-                    if task == "fit":
-                        print(
-                            f"The false alarm rate from the checkpoint ({ad_config['false_alarm']}) "
-                            f"does not match the input ({false_alarm}). Using input value."
-                        )
-                    else:
-                        print(
-                            f"The false alarm rate from the checkpoint ({ad_config['false_alarm']}) "
-                            f"does not match the input ({false_alarm}). Using checkpoint value for inference."
-                        )
+                    if task != "fit":
                         false_alarm = ad_config["false_alarm"]
         else:
             ad_config = {
-                "context_length": context_length if context_length is not None else _AD_CONFIG_DEFAULT["context_length"],
-                "false_alarm": false_alarm if false_alarm is not None else _AD_CONFIG_DEFAULT["false_alarm"],
-                "ad_model_type": ad_model_type if ad_model_type is not None else _AD_CONFIG_DEFAULT["ad_model_type"],
+                "context_length": context_length
+                if context_length is not None
+                else _AD_CONFIG_DEFAULT["context_length"],
+                "false_alarm": false_alarm
+                if false_alarm is not None
+                else _AD_CONFIG_DEFAULT["false_alarm"],
+                "ad_model_type": ad_model_type
+                if ad_model_type is not None
+                else _AD_CONFIG_DEFAULT["ad_model_type"],
             }
             context_length = ad_config["context_length"]
             false_alarm = ad_config["false_alarm"]
             ad_model_type = ad_config["ad_model_type"]
 
-        df_data = _read_ts_data(dataset_path, dataset_config_dictionary=dataset_config_dictionary)
+        df_data = _read_ts_data(
+            dataset_path, dataset_config_dictionary=dataset_config_dictionary
+        )
         context_length = ad_config["context_length"]
         output_tsad_aligned = _get_tsad_aligned_data(
-            df_data, dataset_config_dictionary,
-            ad_config={"prediction_length": 1, "context_length": context_length, "scaling": False},
+            df_data,
+            dataset_config_dictionary,
+            ad_config={
+                "prediction_length": 1,
+                "context_length": context_length,
+                "scaling": False,
+            },
             tsmodel_prediction_dictionary=tsmodel_prediction_dictionary,
         )
 
@@ -1638,7 +1877,10 @@ class _TimeSeriesAnomalyDetectionConformalWrapper:
             y_gt_cp_cal = y_gt_cp[:n_calibration]
             y_pred_cal = y_pred[:n_calibration]
 
-            if ad_model_type in ("timeseries_conformal", "timeseries_conformal_adaptive"):
+            if ad_model_type in (
+                "timeseries_conformal",
+                "timeseries_conformal_adaptive",
+            ):
                 update = ad_model_type == "timeseries_conformal_adaptive"
                 ad_model = _TSADWeightedConformalWrapper(
                     false_alarm=false_alarm,
@@ -1647,8 +1889,12 @@ class _TimeSeriesAnomalyDetectionConformalWrapper:
                     weighting_params=_AD_CONFIG_DEFAULT["weighting_params"],
                     online_adaptive=update,
                 )
-                ad_model.fit(y_cal_pred=np.array(y_pred_cal), y_cal_gt=np.array(y_gt_cp_cal))
-                output_prediction = ad_model.predict(y_pred=np.array(y_pred), y_gt=np.array(y_gt_cp), update=update)
+                ad_model.fit(
+                    y_cal_pred=np.array(y_pred_cal), y_cal_gt=np.array(y_gt_cp_cal)
+                )
+                output_prediction = ad_model.predict(
+                    y_pred=np.array(y_pred), y_gt=np.array(y_gt_cp), update=update
+                )
                 output_ad = {
                     "timestamp": timestamps_source,
                     "KPI": tsmodel_prediction_dictionary["target_columns"],
@@ -1657,17 +1903,24 @@ class _TimeSeriesAnomalyDetectionConformalWrapper:
                     "lower_bound": output_prediction["prediction_interval"]["y_low"],
                     "anomaly_score": 1 - output_prediction["outliers_scores"],
                     "anomaly_label": output_prediction["outliers"] == 1,
-                    "split": ["calibration" if i < n_calibration else "test" for i in range(y_pred.shape[0])],
+                    "split": [
+                        "calibration" if i < n_calibration else "test"
+                        for i in range(y_pred.shape[0])
+                    ],
                 }
 
             if ad_model is not None and ad_model_save is not None:
-                pickle.dump(ad_model, open(ad_model_save + "/model.pkl", "wb"))
-                json.dump(ad_config, open(ad_model_save + "/config.json", "w"))
+                with open(ad_model_save + "/model.pkl", "wb") as _f:
+                    pickle.dump(ad_model, _f)
+                with open(ad_model_save + "/config.json", "w") as _f:
+                    json.dump(ad_config, _f)
 
         if task == "inference":
             if false_alarm is None:
                 false_alarm = ad_model.false_alarm
-            output_prediction = ad_model.predict(y_pred=np.array(y_pred), y_gt=np.array(y_gt_cp))
+            output_prediction = ad_model.predict(
+                y_pred=np.array(y_pred), y_gt=np.array(y_gt_cp)
+            )
             output_ad = {
                 "timestamp": timestamps_source,
                 "KPI": tsmodel_prediction_dictionary["target_columns"],
@@ -1685,25 +1938,50 @@ class _TimeSeriesAnomalyDetectionConformalWrapper:
 # ── Static data ───────────────────────────────────────────────────────────────
 
 _AI_TASKS = [
-    {"task_id": "tsfm_integrated_tsad", "task_description": "Time series Anomaly detection"},
-    {"task_id": "tsfm_forecasting", "task_description": "Time series Multivariate Forecasting"},
-    {"task_id": "tsfm_forecasting_finetune", "task_description": "Finetuning of Multivariate Forecasting models"},
-    {"task_id": "tsfm_forecasting_evaluation", "task_description": "Evaluation of Forecasting models"},
+    {
+        "task_id": "tsfm_integrated_tsad",
+        "task_description": "Time series Anomaly detection",
+    },
+    {
+        "task_id": "tsfm_forecasting",
+        "task_description": "Time series Multivariate Forecasting",
+    },
+    {
+        "task_id": "tsfm_forecasting_finetune",
+        "task_description": "Finetuning of Multivariate Forecasting models",
+    },
+    {
+        "task_id": "tsfm_forecasting_evaluation",
+        "task_description": "Evaluation of Forecasting models",
+    },
 ]
 
 _TSFM_MODELS = [
-    {"model_id": "ttm_96_28", "model_checkpoint": "ttm_96_28",
-     "model_description": "Pretrained forecasting model with context length 96"},
-    {"model_id": "ttm_512_96", "model_checkpoint": "ttm_512_96",
-     "model_description": "Pretrained forecasting model with context length 512"},
-    {"model_id": "ttm_energy_96_28", "model_checkpoint": "ttm_96_28",
-     "model_description": "Pretrained forecasting model tuned on energy data with context length 96"},
-    {"model_id": "ttm_energy_512_96", "model_checkpoint": "ttm_512_96",
-     "model_description": "Pretrained forecasting model tuned on energy data with context length 512"},
+    {
+        "model_id": "ttm_96_28",
+        "model_checkpoint": "ttm_96_28",
+        "model_description": "Pretrained forecasting model with context length 96",
+    },
+    {
+        "model_id": "ttm_512_96",
+        "model_checkpoint": "ttm_512_96",
+        "model_description": "Pretrained forecasting model with context length 512",
+    },
+    {
+        "model_id": "ttm_energy_96_28",
+        "model_checkpoint": "ttm_96_28",
+        "model_description": "Pretrained forecasting model tuned on energy data with context length 96",
+    },
+    {
+        "model_id": "ttm_energy_512_96",
+        "model_checkpoint": "ttm_512_96",
+        "model_description": "Pretrained forecasting model tuned on energy data with context length 512",
+    },
 ]
 
 
 # ── Result models ─────────────────────────────────────────────────────────────
+
 
 class ErrorResult(BaseModel):
     error: str
@@ -1753,6 +2031,7 @@ class TSADResult(BaseModel):
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
+
 def _build_dataset_config(
     timestamp_column: str,
     target_columns: List[str],
@@ -1777,7 +2056,9 @@ def _tsad_output_to_df(output: dict) -> pd.DataFrame:
     kpi = output.pop("KPI", None)
     df = pd.DataFrame.from_dict({k: np.array(v) for k, v in output.items()})
     if kpi is not None:
-        df["KPI"] = kpi[0] if (hasattr(kpi, "__len__") and not isinstance(kpi, str)) else kpi
+        df["KPI"] = (
+            kpi[0] if (hasattr(kpi, "__len__") and not isinstance(kpi, str)) else kpi
+        )
     return df
 
 
@@ -1787,6 +2068,7 @@ mcp = FastMCP("TSFMAgent")
 
 
 # ── Static tools ──────────────────────────────────────────────────────────────
+
 
 @mcp.tool()
 def get_ai_tasks() -> AITasksResult:
@@ -1809,6 +2091,7 @@ def get_tsfm_models() -> TSFMModelsResult:
 
 
 # ── TSFM Forecasting (zero-shot inference) ────────────────────────────────────
+
 
 @mcp.tool()
 def run_tsfm_forecasting(
@@ -1855,15 +2138,22 @@ def run_tsfm_forecasting(
     model_checkpoint = _get_model_checkpoint_path(model_checkpoint)
     dataset_path = _get_dataset_path(dataset_path)
     dataset_config = _build_dataset_config(
-        timestamp_column, target_columns, conditional_columns,
-        id_columns, frequency_sampling, autoregressive_modeling,
+        timestamp_column,
+        target_columns,
+        conditional_columns,
+        id_columns,
+        frequency_sampling,
+        autoregressive_modeling,
     )
 
     try:
         data_df = _read_ts_data(dataset_path, dataset_config_dictionary=dataset_config)
-        model_config = json.load(open(model_checkpoint + "/config.json", "r"))
+        with open(model_checkpoint + "/config.json") as _f:
+            model_config = json.load(_f)
 
-        output_data_quality = _tsfm_data_quality_filter(data_df, dataset_config, model_config, task="inference")
+        output_data_quality = _tsfm_data_quality_filter(
+            data_df, dataset_config, model_config, task="inference"
+        )
         data_df = output_data_quality["data"]
         dataset_config = output_data_quality["dataset_config_dictionary"]
 
@@ -1875,10 +2165,15 @@ def run_tsfm_forecasting(
 
         if len(data_df) > 0:
             output = _get_ttm_hf_inference(
-                data_df, dataset_config, model_config, model_checkpoint,
+                data_df,
+                dataset_config,
+                model_config,
+                model_checkpoint,
                 forecast_horizon=forecast_horizon,
             )
-            inference_result_dict_data["target_prediction"] = output["target_prediction"].tolist()
+            inference_result_dict_data["target_prediction"] = output[
+                "target_prediction"
+            ].tolist()
             inference_result_dict_data["timestamp"] = (
                 np.array(output["timestamp_prediction"]).astype(str).tolist()
             )
@@ -1891,20 +2186,30 @@ def run_tsfm_forecasting(
 
         # Trim to requested forecast horizon
         if forecast_horizon != -1 and "target_prediction" in inference_result_dict_data:
-            target_prediction = np.array(inference_result_dict_data["target_prediction"])
+            target_prediction = np.array(
+                inference_result_dict_data["target_prediction"]
+            )
             if 0 < forecast_horizon <= target_prediction.shape[1]:
-                inference_result_dict_data["target_prediction"] = target_prediction[:, :forecast_horizon, :].tolist()
-                inference_result_dict_data["timestamp"] = (
-                    np.array(inference_result_dict_data["timestamp"])[:, :forecast_horizon].tolist()
-                )
+                inference_result_dict_data["target_prediction"] = target_prediction[
+                    :, :forecast_horizon, :
+                ].tolist()
+                inference_result_dict_data["timestamp"] = np.array(
+                    inference_result_dict_data["timestamp"]
+                )[:, :forecast_horizon].tolist()
 
-        results_file = _write_json_to_temp(json.dumps(inference_result_dict_data, indent=4))
+        results_file = _write_json_to_temp(
+            json.dumps(inference_result_dict_data, indent=4)
+        )
 
     except Exception as exc:
         logger.error("run_tsfm_forecasting failed: %s", exc)
         return ErrorResult(error=str(exc))
 
-    dataquality_summary = output_data_quality["dataquality_summary"] if include_dataquality_summary else None
+    dataquality_summary = (
+        output_data_quality["dataquality_summary"]
+        if include_dataquality_summary
+        else None
+    )
     return ForecastingResult(
         status="success",
         results_file=results_file,
@@ -1914,6 +2219,7 @@ def run_tsfm_forecasting(
 
 
 # ── TSFM Finetuning ───────────────────────────────────────────────────────────
+
 
 @mcp.tool()
 def run_tsfm_finetuning(
@@ -1967,17 +2273,24 @@ def run_tsfm_finetuning(
     dataset_path = _get_dataset_path(dataset_path)
     abs_save_dir = _get_outputs_path(save_model_dir)
     dataset_config = _build_dataset_config(
-        timestamp_column, target_columns, conditional_columns,
-        id_columns, frequency_sampling, autoregressive_modeling,
+        timestamp_column,
+        target_columns,
+        conditional_columns,
+        id_columns,
+        frequency_sampling,
+        autoregressive_modeling,
     )
 
     try:
         data_df = _read_ts_data(dataset_path, dataset_config_dictionary=dataset_config)
-        model_config = json.load(open(model_checkpoint + "/config.json", "r"))
+        with open(model_checkpoint + "/config.json") as _f:
+            model_config = json.load(_f)
 
         os.makedirs(abs_save_dir, exist_ok=True)
 
-        output_data_quality = _tsfm_data_quality_filter(data_df, dataset_config, model_config, task="finetuning")
+        output_data_quality = _tsfm_data_quality_filter(
+            data_df, dataset_config, model_config, task="finetuning"
+        )
         data_df = output_data_quality["data"]
         dataset_config = output_data_quality["dataset_config_dictionary"]
 
@@ -1988,8 +2301,14 @@ def run_tsfm_finetuning(
             )
 
         output = _finetune_ttm_hf(
-            data_df, dataset_config, model_config, abs_save_dir,
-            n_finetune, n_calibration, n_test, model_checkpoint=model_checkpoint,
+            data_df,
+            dataset_config,
+            model_config,
+            abs_save_dir,
+            n_finetune,
+            n_calibration,
+            n_test,
+            model_checkpoint=model_checkpoint,
         )
 
         result_dict = output.copy()
@@ -2000,10 +2319,14 @@ def run_tsfm_finetuning(
             df_perf["forecast"] = df_perf["forecast"].values + 1
             max_forecast = df_perf["forecast"].max()
             if 0 < forecast_horizon <= max_forecast:
-                result_dict["performance"] = df_perf.loc[df_perf["forecast"] == forecast_horizon].to_dict()
+                result_dict["performance"] = df_perf.loc[
+                    df_perf["forecast"] == forecast_horizon
+                ].to_dict()
 
         if include_dataquality_summary:
-            result_dict["dataquality_summary"] = output_data_quality["dataquality_summary"]
+            result_dict["dataquality_summary"] = output_data_quality[
+                "dataquality_summary"
+            ]
 
         results_file = _write_json_to_temp(json.dumps(result_dict, indent=4))
 
@@ -2013,7 +2336,9 @@ def run_tsfm_finetuning(
 
     try:
         fewshot_dir = abs_save_dir + "/fewshot/"
-        saved_checkpoint = (_find_largest_tsfm_checkpoint_directory(fewshot_dir) or abs_save_dir) + "/"
+        saved_checkpoint = (
+            _find_largest_tsfm_checkpoint_directory(fewshot_dir) or abs_save_dir
+        ) + "/"
     except Exception as exc:
         logger.warning("Could not resolve finetuned checkpoint path: %s", exc)
         saved_checkpoint = save_model_dir
@@ -2030,6 +2355,7 @@ def run_tsfm_finetuning(
 
 
 # ── TSAD (conformal anomaly detection on top of TSFM forecasts) ──────────────
+
 
 @mcp.tool()
 def run_tsad(
@@ -2084,8 +2410,12 @@ def run_tsad(
         return ErrorResult(error=f"tsfm dependencies unavailable: {exc}")
 
     dataset_config = _build_dataset_config(
-        timestamp_column, target_columns, conditional_columns,
-        id_columns, frequency_sampling or "", autoregressive_modeling,
+        timestamp_column,
+        target_columns,
+        conditional_columns,
+        id_columns,
+        frequency_sampling or "",
+        autoregressive_modeling,
     )
 
     try:
@@ -2093,7 +2423,9 @@ def run_tsad(
             tsmodel_pred = json.load(fh)
 
         output = _TimeSeriesAnomalyDetectionConformalWrapper().run(
-            dataset_path, dataset_config, tsmodel_pred,
+            dataset_path,
+            dataset_config,
+            tsmodel_pred,
             ad_model_checkpoint=ad_model_checkpoint,
             ad_model_save=ad_model_save,
             task=task,
@@ -2110,7 +2442,9 @@ def run_tsad(
         tmp_dir = tempfile.mkdtemp()
         csv_path = os.path.join(tmp_dir, f"tsad_output_{uuid.uuid4()}.csv")
         df.to_csv(csv_path, index=False)
-        anomaly_count = int(df["anomaly_label"].sum()) if "anomaly_label" in df.columns else 0
+        anomaly_count = (
+            int(df["anomaly_label"].sum()) if "anomaly_label" in df.columns else 0
+        )
     except Exception as exc:
         logger.error("run_tsad result serialisation failed: %s", exc)
         return ErrorResult(error=f"Failed to serialise TSAD output: {exc}")
@@ -2129,6 +2463,7 @@ def run_tsad(
 
 
 # ── Integrated TSAD (forecasting + anomaly detection in one call) ─────────────
+
 
 @mcp.tool()
 def run_integrated_tsad(
@@ -2180,29 +2515,41 @@ def run_integrated_tsad(
         ad_model_save = _get_outputs_path("tsad_model_save/")
         os.makedirs(ad_model_save, exist_ok=True)
 
-        model_config = json.load(open(model_checkpoint + "/config.json", "r"))
+        with open(model_checkpoint + "/config.json") as _f:
+            model_config = json.load(_f)
         df_combined = pd.DataFrame()
 
         for col in target_columns:
             col_config = _build_dataset_config(
-                timestamp_column, [col], conditional_columns,
-                id_columns, frequency_sampling, autoregressive_modeling,
+                timestamp_column,
+                [col],
+                conditional_columns,
+                id_columns,
+                frequency_sampling,
+                autoregressive_modeling,
             )
 
             # 1. Load and quality-filter data for this column
             data_df = _read_ts_data(dataset_path, dataset_config_dictionary=col_config)
-            output_dq = _tsfm_data_quality_filter(data_df, col_config, model_config, task="inference")
+            output_dq = _tsfm_data_quality_filter(
+                data_df, col_config, model_config, task="inference"
+            )
             data_df_filtered = output_dq["data"]
             col_config_filtered = output_dq["dataset_config_dictionary"]
 
             if len(data_df_filtered) == 0:
-                logger.warning("Data quality filter removed all data for column %s; skipping.", col)
+                logger.warning(
+                    "Data quality filter removed all data for column %s; skipping.", col
+                )
                 continue
 
             # 2. Zero-shot forecasting for this column
             try:
                 forecast_output = _get_ttm_hf_inference(
-                    data_df_filtered, col_config_filtered, model_config, model_checkpoint,
+                    data_df_filtered,
+                    col_config_filtered,
+                    model_config,
+                    model_checkpoint,
                 )
             except Exception as exc:
                 logger.warning("Forecasting failed for column %s: %s", col, exc)
@@ -2210,18 +2557,19 @@ def run_integrated_tsad(
 
             inference_data = {
                 "target_prediction": forecast_output["target_prediction"].tolist(),
-                "timestamp": np.array(forecast_output["timestamp_prediction"]).astype(str).tolist(),
+                "timestamp": np.array(forecast_output["timestamp_prediction"])
+                .astype(str)
+                .tolist(),
                 "target_columns": forecast_output["target_columns"],
             }
-            results_file = _write_json_to_temp(json.dumps(inference_data, indent=4))
-
             # 3. Conformal anomaly detection for this column
-            with open(results_file, "r") as fh:
-                tsmodel_pred = json.load(fh)
+            tsmodel_pred = inference_data
 
             try:
                 tsad_output = _TimeSeriesAnomalyDetectionConformalWrapper().run(
-                    dataset_path, col_config, tsmodel_pred,
+                    dataset_path,
+                    col_config,
+                    tsmodel_pred,
                     ad_model_checkpoint=None,
                     ad_model_save=ad_model_save,
                     task="fit",
