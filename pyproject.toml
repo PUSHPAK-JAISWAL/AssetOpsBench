@@ -28,6 +28,7 @@ dependencies = [
 
 [project.scripts]
 plan-execute = "plan_execute.cli:main"
+tsfm-mcp-server = "servers.tsfm.main:main"
 
 
 [dependency-groups]
