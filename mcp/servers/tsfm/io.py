@@ -16,10 +16,17 @@ import pandas as pd
 # ── Path helpers ──────────────────────────────────────────────────────────────
 
 
+_DEFAULT_MODELS_DIR = os.path.join(
+    os.path.dirname(__file__), "artifacts", "output", "tuned_models"
+)
+
+
 def _get_model_checkpoint_path(model_checkpoint: str) -> str:
     if os.path.isabs(model_checkpoint):
         return model_checkpoint
-    return os.path.join(os.environ.get("PATH_TO_MODELS_DIR", ""), model_checkpoint)
+    return os.path.join(
+        os.environ.get("PATH_TO_MODELS_DIR", _DEFAULT_MODELS_DIR), model_checkpoint
+    )
 
 
 def _get_dataset_path(dataset: str) -> str:
