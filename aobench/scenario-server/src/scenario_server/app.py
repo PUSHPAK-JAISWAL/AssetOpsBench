@@ -5,6 +5,7 @@ import string
 import time
 
 from litestar import Litestar, Request, get
+from litestar.logging import LoggingConfig
 from litestar.middleware import DefineMiddleware
 from litestar.openapi.config import OpenAPIConfig
 from litestar.response import Redirect
@@ -119,6 +120,16 @@ def get_app(
 
     openapi_cfg: OpenAPIConfig = openapi_config or OPENAPI_CONFIG
 
+    logging_config = LoggingConfig(
+        root={"level": "INFO", "handlers": ["queue_listener"]},
+        formatters={
+            "standard": {
+                "format": "[%(levelname)1.1s %(asctime)s %(filename)-24s:%(lineno)5d] :: %(message)s"
+            }
+        },
+        log_exceptions="always",
+    )
+
     app = Litestar(
         debug=debug,
         middleware=[DefineMiddleware(RequestTimingMiddleware)],
@@ -126,6 +137,7 @@ def get_app(
         openapi_config=openapi_cfg,
         on_startup=[startup],
         on_shutdown=[shutdown],
+        logging_config=logging_config,
     )
 
     return app
