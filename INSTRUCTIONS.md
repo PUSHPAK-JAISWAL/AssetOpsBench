@@ -11,6 +11,7 @@ This directory contains the MCP servers and infrastructure for the AssetOpsBench
   - [IoTAgent](#iotagent)
   - [Utilities](#utilities)
   - [FMSRAgent](#fmsragent)
+  - [TSFMAgent](#tsfmagent)
 - [Plan-Execute Runner](#plan-execute-runner)
   - [How it works](#how-it-works)
   - [CLI](#cli)
@@ -69,6 +70,7 @@ Use `uv run` to start the MCP servers (paths relative to repo root):
 uv run python mcp/servers/utilities/main.py
 uv run python mcp/servers/iot/main.py
 uv run python mcp/servers/fmsr/main.py
+uv run python mcp/servers/tsfm/main.py
 ```
 
 ---
@@ -86,6 +88,9 @@ uv run python mcp/servers/fmsr/main.py
 | `WATSONX_URL` | `--platform watsonx` | WatsonX endpoint (optional; defaults to `https://us-south.ml.cloud.ibm.com`) |
 | `LITELLM_API_KEY` | `--platform litellm` | LiteLLM API key |
 | `LITELLM_BASE_URL` | `--platform litellm` | LiteLLM base URL (e.g. `https://your-litellm-host.example.com`) |
+| `PATH_TO_MODELS_DIR` | TSFM server | Base directory for TTM model checkpoints (default: `mcp/servers/tsfm/artifacts/output/tuned_models`) |
+| `PATH_TO_DATASETS_DIR` | TSFM server | Base directory for resolving relative dataset paths |
+| `PATH_TO_OUTPUTS_DIR` | TSFM server | Base directory for resolving output/save paths |
 
 ---
 
@@ -124,6 +129,21 @@ uv run python mcp/servers/fmsr/main.py
 |---|---|---|
 | `get_failure_modes` | `asset_name` | Return known failure modes for an asset. Uses a curated YAML list for chillers and AHUs; falls back to the LLM for other types. |
 | `get_failure_mode_sensor_mapping` | `asset_name`, `failure_modes`, `sensors` | For each (failure mode, sensor) pair, determine relevancy via LLM. Returns bidirectional `fm→sensors` and `sensor→fms` maps plus full per-pair details. |
+
+### TSFMAgent
+
+**Path:** `mcp/servers/tsfm/main.py`
+**Requires:** `tsfm_public` (IBM Granite TSFM), `transformers`, `torch` for ML tools — imported lazily; static tools work without them.
+**Model checkpoints:** resolved relative to `PATH_TO_MODELS_DIR` (default: `mcp/servers/tsfm/artifacts/output/tuned_models`)
+
+| Tool | Arguments | Description |
+|---|---|---|
+| `get_ai_tasks` | — | List supported AI task types for time-series analysis |
+| `get_tsfm_models` | — | List available pre-trained TinyTimeMixer (TTM) model checkpoints |
+| `run_tsfm_forecasting` | `dataset_path`, `timestamp_column`, `target_columns`, `model_checkpoint?`, `forecast_horizon?`, `frequency_sampling?`, ... | Zero-shot TTM inference; returns path to a JSON predictions file |
+| `run_tsfm_finetuning` | `dataset_path`, `timestamp_column`, `target_columns`, `model_checkpoint?`, `save_model_dir?`, `n_finetune?`, `n_test?`, ... | Few-shot fine-tune a TTM model; returns saved checkpoint path and metrics file |
+| `run_tsad` | `dataset_path`, `tsfm_output_json`, `timestamp_column`, `target_columns`, `task?`, `false_alarm?`, `ad_model_type?`, ... | Conformal anomaly detection on top of a forecasting output JSON; returns CSV with anomaly labels |
+| `run_integrated_tsad` | `dataset_path`, `timestamp_column`, `target_columns`, `model_checkpoint?`, `false_alarm?`, `n_calibration?`, ... | End-to-end forecasting + anomaly detection in one call; returns combined CSV |
 
 ---
 
@@ -271,6 +291,7 @@ runner = PlanExecuteRunner(
         "IoTAgent":  Path("mcp/servers/iot/main.py"),
         "Utilities": Path("mcp/servers/utilities/main.py"),
         "FMSRAgent": Path("mcp/servers/fmsr/main.py"),
+        "TSFMAgent": Path("mcp/servers/tsfm/main.py"),
     },
 )
 ```
@@ -323,6 +344,7 @@ uv run pytest mcp/ -v
 Integration tests are auto-skipped when the required service is not available:
 - IoT integration tests require `COUCHDB_URL` (set in `.env`)
 - FMSR integration tests require `WATSONX_APIKEY` (set in `.env`)
+- TSFM integration tests require `PATH_TO_MODELS_DIR` and `PATH_TO_DATASETS_DIR` (set in `.env`)
 
 ### Unit tests only (no services required)
 
@@ -336,6 +358,7 @@ uv run pytest mcp/ -v -k "not integration"
 uv run pytest mcp/servers/iot/tests/test_tools.py -k "not integration"
 uv run pytest mcp/servers/utilities/tests/
 uv run pytest mcp/servers/fmsr/tests/ -k "not integration"
+uv run pytest mcp/servers/tsfm/tests/ -k "not integration"
 uv run pytest mcp/plan_execute/tests/
 ```
 
@@ -365,8 +388,8 @@ uv run pytest mcp/ -v
 │                   │ stdio      │                     │
 └───────────────────┼────────────┼─────────────────────┘
                     │ MCP protocol (stdio)
-         ┌──────────┼──────────┐
-         ▼          ▼          ▼
-      IoTAgent   Utilities   FMSRAgent
-      (tools)    (tools)     (tools)
+         ┌──────────┼──────────┬──────────┐
+         ▼          ▼          ▼          ▼
+      IoTAgent   Utilities   FMSRAgent  TSFMAgent
+      (tools)    (tools)     (tools)    (tools)
 ```
