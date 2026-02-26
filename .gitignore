@@ -199,3 +199,4 @@ benchmark/cods_track2/.env.local
 CLAUDE.md
 mcp/couchdb/sample_data/bulk_docs.json
 .env
+mcp/servers/tsfm/artifacts/tsfm_models/
