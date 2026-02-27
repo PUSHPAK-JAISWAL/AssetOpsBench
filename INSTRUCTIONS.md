@@ -51,8 +51,6 @@ uv sync
 
 ```bash
 source .venv/bin/activate   # macOS / Linux
-# then use commands directly, e.g.:
-plan-execute "What assets are at site MAIN?"
 ```
 
 ### 2. Configure environment
