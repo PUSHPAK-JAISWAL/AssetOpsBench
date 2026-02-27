@@ -64,10 +64,7 @@ We are expanding **AssetOpsBench** to cover a broader range of industrial challe
 
 - 📊 **Dataset Update:** **AssetOpsBench** expanded to cover wider variety of 9 Asset classes (Chiller, AHU, Pump, Motor, Bearing, Engine, Rotors, Boilers, Turbine, etc.) and various Tasks (Remaining Useful Life, Fault Classification, Rule Monitoring, etc.) <br>![Hugging Face](https://img.shields.io/badge/HuggingFace-AssetOpsBench-yellow?logo=huggingface)
 [![Dataset](https://img.shields.io/badge/Dataset-ibm--research%2FAssetOpsBench-blue)](https://huggingface.co/datasets/ibm-research/AssetOpsBench)
-<br>Special Thanks to primary 👥 **Contributors:** [@DeveloperMindset123](https://github.com/DeveloperMindset123), [@ChathurangiShyalika](https://github.com/ChathurangiShyalika), [@Fabio-Lorenzi1](https://github.com/Fabio-Lorenzi1)
-
-- 📊 **Dataset Update:** **AssetOpsBench** expanded to cover wider variety of Asset classes (Chiller, AHU, Pump, Motor, Bearing, Engine, Rotors, Boilers, Turbine, etc.) and various Tasks (Remaining Useful Life, Fault Classification, Rule Monitoring, etc.) ![Hugging Face](https://img.shields.io/badge/HuggingFace-AssetOpsBench-yellow?logo=huggingface)
-[![Dataset](https://img.shields.io/badge/Dataset-ibm--research%2FAssetOpsBench-blue)](https://huggingface.co/datasets/ibm-research/AssetOpsBench) Special Thanks to primary 👥 **Contributors:** [@DeveloperMindset123](https://github.com/DeveloperMindset123), [@ChathurangiShyalika](https://github.com/ChathurangiShyalika), [@Fabio-Lorenzi1](https://github.com/Fabio-Lorenzi1)
+<br>Special Thanks to primary **Contributors:** 👥 [@DeveloperMindset123](https://github.com/DeveloperMindset123), [@ChathurangiShyalika](https://github.com/ChathurangiShyalika), [@Fabio-Lorenzi1](https://github.com/Fabio-Lorenzi1)
 
 - 📰 **AAAI-2026:** **SPIRAL: Symbolic LLM Planning via Grounded and Reflective Search** ![Authors](https://img.shields.io/badge/Authors-Y_Zhang,_G_Ganapavarapu,_S_Jayaraman,_B_Agrawal,_D_Patel,_A_Fokoue-lightgrey)  
 [![Code](https://img.shields.io/badge/Code-IBM%2FSPIRAL-blue?logo=github)](https://github.com/IBM/SPIRAL)
