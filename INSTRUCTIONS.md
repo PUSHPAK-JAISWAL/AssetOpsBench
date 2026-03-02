@@ -27,7 +27,7 @@ This directory contains the MCP servers and infrastructure for the AssetOpsBench
 
 ## Prerequisites
 
-- **Python 3.14+** — required by `pyproject.toml`
+- **Python 3.12+** — required by `pyproject.toml`
 - **[uv](https://docs.astral.sh/uv/)** — dependency and environment manager
 
   ```bash
