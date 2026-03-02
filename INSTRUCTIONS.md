@@ -66,7 +66,7 @@ cp .env.public .env
 ### 3. Start CouchDB
 
 ```bash
-docker compose -f mcp/couchdb/docker-compose.yaml up -d
+docker compose -f src/couchdb/docker-compose.yaml up -d
 ```
 
 Verify CouchDB is running:
@@ -101,7 +101,7 @@ uv run tsfm-mcp-server
 | `WATSONX_URL` | `--platform watsonx` | WatsonX endpoint (optional; defaults to `https://us-south.ml.cloud.ibm.com`) |
 | `LITELLM_API_KEY` | `--platform litellm` | LiteLLM API key |
 | `LITELLM_BASE_URL` | `--platform litellm` | LiteLLM base URL (e.g. `https://your-litellm-host.example.com`) |
-| `PATH_TO_MODELS_DIR` | TSFM server | Base directory for TTM model checkpoints (default: `mcp/servers/tsfm/artifacts/output/tuned_models`) |
+| `PATH_TO_MODELS_DIR` | TSFM server | Base directory for TTM model checkpoints (default: `src/servers/tsfm/artifacts/output/tuned_models`) |
 | `PATH_TO_DATASETS_DIR` | TSFM server | Base directory for resolving relative dataset paths |
 | `PATH_TO_OUTPUTS_DIR` | TSFM server | Base directory for resolving output/save paths |
 
@@ -111,7 +111,7 @@ uv run tsfm-mcp-server
 
 ### IoTAgent
 
-**Path:** `mcp/servers/iot/main.py`
+**Path:** `src/servers/iot/main.py`
 **Requires:** CouchDB (`COUCHDB_URL`, `COUCHDB_DBNAME`, `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`)
 
 | Tool | Arguments | Description |
@@ -123,7 +123,7 @@ uv run tsfm-mcp-server
 
 ### Utilities
 
-**Path:** `mcp/servers/utilities/main.py`
+**Path:** `src/servers/utilities/main.py`
 **Requires:** nothing (no external services)
 
 | Tool | Arguments | Description |
@@ -134,9 +134,9 @@ uv run tsfm-mcp-server
 
 ### FMSRAgent
 
-**Path:** `mcp/servers/fmsr/main.py`
+**Path:** `src/servers/fmsr/main.py`
 **Requires:** `WATSONX_APIKEY`, `WATSONX_PROJECT_ID`, `WATSONX_URL` for unknown assets; curated lists for `chiller` and `ahu` work without credentials.
-**Failure-mode data:** `mcp/servers/fmsr/failure_modes.yaml` (edit to add/change asset entries)
+**Failure-mode data:** `src/servers/fmsr/failure_modes.yaml` (edit to add/change asset entries)
 
 | Tool | Arguments | Description |
 |---|---|---|
@@ -145,9 +145,9 @@ uv run tsfm-mcp-server
 
 ### TSFMAgent
 
-**Path:** `mcp/servers/tsfm/main.py`
+**Path:** `src/servers/tsfm/main.py`
 **Requires:** `tsfm_public` (IBM Granite TSFM), `transformers`, `torch` for ML tools — imported lazily; static tools work without them.
-**Model checkpoints:** resolved relative to `PATH_TO_MODELS_DIR` (default: `mcp/servers/tsfm/artifacts/output/tuned_models`)
+**Model checkpoints:** resolved relative to `PATH_TO_MODELS_DIR` (default: `src/servers/tsfm/artifacts/output/tuned_models`)
 
 | Tool | Arguments | Description |
 |---|---|---|
@@ -162,7 +162,7 @@ uv run tsfm-mcp-server
 
 ## Plan-Execute Runner
 
-`mcp/plan_execute/` is a custom MCP client that implements a **plan-and-execute** workflow over the MCP servers. It replaces AgentHive's bespoke orchestration with the standard MCP protocol.
+`src/plan_execute/` is a custom MCP client that implements a **plan-and-execute** workflow over the MCP servers. It replaces AgentHive's bespoke orchestration with the standard MCP protocol.
 
 ### How it works
 
@@ -346,7 +346,7 @@ Add the following to your Claude Desktop `claude_desktop_config.json`:
 Run the full suite from the repo root (unit + integration where services are available):
 
 ```bash
-uv run pytest mcp/ -v
+uv run pytest src/ -v
 ```
 
 Integration tests are auto-skipped when the required service is not available:
@@ -357,24 +357,24 @@ Integration tests are auto-skipped when the required service is not available:
 ### Unit tests only (no services required)
 
 ```bash
-uv run pytest mcp/ -v -k "not integration"
+uv run pytest src/ -v -k "not integration"
 ```
 
 ### Per-server
 
 ```bash
-uv run pytest mcp/servers/iot/tests/test_tools.py -k "not integration"
-uv run pytest mcp/servers/utilities/tests/
-uv run pytest mcp/servers/fmsr/tests/ -k "not integration"
-uv run pytest mcp/servers/tsfm/tests/ -k "not integration"
-uv run pytest mcp/plan_execute/tests/
+uv run pytest src/servers/iot/tests/test_tools.py -k "not integration"
+uv run pytest src/servers/utilities/tests/
+uv run pytest src/servers/fmsr/tests/ -k "not integration"
+uv run pytest src/servers/tsfm/tests/ -k "not integration"
+uv run pytest src/plan_execute/tests/
 ```
 
 ### Integration tests (requires CouchDB + WatsonX)
 
 ```bash
-docker compose -f mcp/couchdb/docker-compose.yaml up -d
-uv run pytest mcp/ -v
+docker compose -f src/couchdb/docker-compose.yaml up -d
+uv run pytest src/ -v
 ```
 
 ---
