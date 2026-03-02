@@ -162,7 +162,7 @@ uv run tsfm-mcp-server
 
 ## Plan-Execute Runner
 
-`src/plan_execute/` is a custom MCP client that implements a **plan-and-execute** workflow over the MCP servers. It replaces AgentHive's bespoke orchestration with the standard MCP protocol.
+`src/workflow/` is a custom MCP client that implements a **plan-and-execute** workflow over the MCP servers. It replaces AgentHive's bespoke orchestration with the standard MCP protocol.
 
 ### How it works
 
@@ -260,7 +260,7 @@ Expected execution output (trimmed):
 
 ```python
 import asyncio
-from plan_execute import PlanExecuteRunner
+from workflow import PlanExecuteRunner
 from llm import LiteLLMBackend
 
 runner = PlanExecuteRunner(llm=LiteLLMBackend("watsonx/meta-llama/llama-3-3-70b-instruct"))
@@ -281,7 +281,7 @@ print(result.answer)
 Implement `LLMBackend` to use any model:
 
 ```python
-from plan_execute.llm import LLMBackend
+from llm import LLMBackend
 
 class MyLLM(LLMBackend):
     def generate(self, prompt: str, temperature: float = 0.0) -> str:
@@ -295,7 +295,7 @@ runner = PlanExecuteRunner(llm=MyLLM())
 Pass `server_paths` to register additional servers. Keys must match the agent names the planner assigns steps to:
 
 ```python
-from plan_execute import PlanExecuteRunner
+from workflow import PlanExecuteRunner
 
 runner = PlanExecuteRunner(
     llm=my_llm,
@@ -367,7 +367,7 @@ uv run pytest src/servers/iot/tests/test_tools.py -k "not integration"
 uv run pytest src/servers/utilities/tests/
 uv run pytest src/servers/fmsr/tests/ -k "not integration"
 uv run pytest src/servers/tsfm/tests/ -k "not integration"
-uv run pytest src/plan_execute/tests/
+uv run pytest src/workflow/tests/
 ```
 
 ### Integration tests (requires CouchDB + WatsonX)
@@ -383,7 +383,7 @@ uv run pytest src/ -v
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│                   plan_execute/                      │
+│                     workflow/                        │
 │                                                      │
 │  PlanExecuteRunner.run(question)                     │
 │  ┌────────────┐   ┌────────────┐   ┌──────────────┐ │
