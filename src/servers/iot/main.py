@@ -18,13 +18,13 @@ logger = logging.getLogger("iot-mcp-server")
 # Configuration from environment
 COUCHDB_URL = os.environ.get("COUCHDB_URL")
 COUCHDB_DBNAME = os.environ.get("IOT_DBNAME")
-COUCHDB_USER = os.environ.get("COUCHDB_USERNAME")
+COUCHDB_USERNAME = os.environ.get("COUCHDB_USERNAME")
 COUCHDB_PASSWORD = os.environ.get("COUCHDB_PASSWORD")
 
 # Initialize CouchDB
 try:
     db = couchdb3.Database(
-        COUCHDB_DBNAME, url=COUCHDB_URL, user=COUCHDB_USER, password=COUCHDB_PASSWORD
+        COUCHDB_DBNAME, url=COUCHDB_URL, user=COUCHDB_USERNAME, password=COUCHDB_PASSWORD
     )
     logger.info(f"Connected to CouchDB: {COUCHDB_DBNAME}")
 except Exception as e:
