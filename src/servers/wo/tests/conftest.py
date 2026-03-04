@@ -31,11 +31,11 @@ requires_wo_data = pytest.mark.skipif(
 @pytest.fixture(autouse=True)
 def reset_data_cache():
     """Reset the module-level data cache between tests."""
-    import servers.wo.main as wo_main
-    original = dict(wo_main._data)
-    wo_main._data = {k: None for k in original}
+    import servers.wo.data as wo_data
+    original = dict(wo_data._data)
+    wo_data._data = {k: None for k in original}
     yield
-    wo_main._data = original
+    wo_data._data = original
 
 
 def _make_wo_df() -> pd.DataFrame:
@@ -125,15 +125,15 @@ def _make_alert_events_df() -> pd.DataFrame:
 @pytest.fixture
 def mock_data():
     """Patch all module-level data caches with minimal fixture DataFrames."""
-    import servers.wo.main as wo_main
+    import servers.wo.data as wo_data
 
-    wo_main._data["wo_events"] = _make_wo_df()
-    wo_main._data["events"] = _make_events_df()
-    wo_main._data["failure_codes"] = _make_failure_codes_df()
-    wo_main._data["primary_failure_codes"] = _make_primary_failure_codes_df()
-    wo_main._data["alert_events"] = _make_alert_events_df()
+    wo_data._data["wo_events"] = _make_wo_df()
+    wo_data._data["events"] = _make_events_df()
+    wo_data._data["failure_codes"] = _make_failure_codes_df()
+    wo_data._data["primary_failure_codes"] = _make_primary_failure_codes_df()
+    wo_data._data["alert_events"] = _make_alert_events_df()
     yield
-    wo_main._data = {k: None for k in wo_main._data}
+    wo_data._data = {k: None for k in wo_data._data}
 
 
 async def call_tool(mcp_instance, tool_name: str, args: dict) -> dict:
