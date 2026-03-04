@@ -1,9 +1,9 @@
 import json
 import os
+from unittest.mock import patch
 
 import pytest
 import pandas as pd
-from unittest.mock import patch
 
 from dotenv import load_dotenv
 
@@ -11,31 +11,13 @@ load_dotenv()
 
 # --- Custom markers ---
 
-requires_wo_data = pytest.mark.skipif(
-    not os.path.exists(
-        os.environ.get(
-            "WO_DATA_DIR",
-            os.path.join(
-                os.path.dirname(__file__),
-                "../../../../tmp/assetopsbench/sample_data",
-            ),
-        )
-    ),
-    reason="Work order sample data directory not found (set WO_DATA_DIR)",
+requires_couchdb = pytest.mark.skipif(
+    not os.environ.get("COUCHDB_URL"),
+    reason="CouchDB not configured (set COUCHDB_URL)",
 )
 
 
-# --- Fixtures ---
-
-
-@pytest.fixture(autouse=True)
-def reset_data_cache():
-    """Reset the module-level data cache between tests."""
-    import servers.wo.data as wo_data
-    original = dict(wo_data._data)
-    wo_data._data = {k: None for k in original}
-    yield
-    wo_data._data = original
+# --- Fixture DataFrames ---
 
 
 def _make_wo_df() -> pd.DataFrame:
@@ -106,7 +88,7 @@ def _make_alert_events_df() -> pd.DataFrame:
     data = {
         "equipment_id": ["CWC04013", "CWC04013", "CWC04013"],
         "equipment_name": ["Chiller 13", "Chiller 13", "Chiller 13"],
-        "rule": ["CR00002", "CR00002", "CR00002"],
+        "rule_id": ["CR00002", "CR00002", "CR00002"],
         "start_time": [
             pd.Timestamp("2017-01-01"),
             pd.Timestamp("2017-03-01"),
@@ -122,18 +104,27 @@ def _make_alert_events_df() -> pd.DataFrame:
     return pd.DataFrame(data)
 
 
+_FIXTURE_DATA = {
+    "wo_events": _make_wo_df,
+    "events": _make_events_df,
+    "failure_codes": _make_failure_codes_df,
+    "primary_failure_codes": _make_primary_failure_codes_df,
+    "alert_events": _make_alert_events_df,
+}
+
+
+# --- Fixtures ---
+
+
 @pytest.fixture
 def mock_data():
-    """Patch all module-level data caches with minimal fixture DataFrames."""
-    import servers.wo.data as wo_data
+    """Patch load() in tools namespace to return fixture DataFrames without CouchDB."""
+    def _fake_load(key: str):
+        factory = _FIXTURE_DATA.get(key)
+        return factory() if factory else None
 
-    wo_data._data["wo_events"] = _make_wo_df()
-    wo_data._data["events"] = _make_events_df()
-    wo_data._data["failure_codes"] = _make_failure_codes_df()
-    wo_data._data["primary_failure_codes"] = _make_primary_failure_codes_df()
-    wo_data._data["alert_events"] = _make_alert_events_df()
-    yield
-    wo_data._data = {k: None for k in wo_data._data}
+    with patch("servers.wo.tools.load", side_effect=_fake_load):
+        yield
 
 
 async def call_tool(mcp_instance, tool_name: str, args: dict) -> dict:

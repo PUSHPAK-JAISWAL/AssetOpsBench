@@ -1,7 +1,10 @@
-"""Data loading and query helpers for the Work Order MCP server.
+"""Data access helpers for the Work Order MCP server.
 
-All CSVs are loaded lazily on first access.  Missing files log a warning and
-return ``None`` so the server starts even when only a subset of data is present.
+Reads from a CouchDB ``workorder`` database populated by ``src/couchdb/init_wo.py``.
+Each document carries a ``_dataset`` field that acts as a collection discriminator.
+
+Connection is established lazily on first use.  If CouchDB is unavailable the
+helpers return ``None`` / empty results so the server can still start.
 """
 
 import logging
@@ -17,88 +20,86 @@ from .models import EventItem, WorkOrderItem
 logger = logging.getLogger("wo-mcp-server")
 
 # ---------------------------------------------------------------------------
-# Data directory
+# Configuration
 # ---------------------------------------------------------------------------
 
-_DEFAULT_DATA_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "../../tmp/assetopsbench/sample_data")
-)
-WO_DATA_DIR: str = os.environ.get("WO_DATA_DIR", _DEFAULT_DATA_DIR)
+COUCHDB_URL: str = os.environ.get("COUCHDB_URL", "http://localhost:5984")
+COUCHDB_USERNAME: str = os.environ.get("COUCHDB_USERNAME", "admin")
+COUCHDB_PASSWORD: str = os.environ.get("COUCHDB_PASSWORD", "password")
+WO_COUCHDB_DBNAME: str = os.environ.get("WO_COUCHDB_DBNAME", "workorder")
+
+# ---------------------------------------------------------------------------
+# Lazy connection
+# ---------------------------------------------------------------------------
+
+_db = None  # couchdb3.Database instance, initialised on first call to _get_db()
 
 
-def _csv(filename: str) -> str:
-    return os.path.join(WO_DATA_DIR, filename)
+def _get_db():
+    """Return a live couchdb3.Database, connecting on first call."""
+    global _db
+    if _db is not None:
+        return _db
+    try:
+        import couchdb3  # lazy import so the server starts without couchdb3 installed
+
+        _db = couchdb3.Database(
+            WO_COUCHDB_DBNAME,
+            url=COUCHDB_URL,
+            user=COUCHDB_USERNAME,
+            password=COUCHDB_PASSWORD,
+        )
+        logger.info("Connected to CouchDB database '%s'", WO_COUCHDB_DBNAME)
+    except Exception as exc:
+        logger.error("Failed to connect to CouchDB: %s", exc)
+        _db = None
+    return _db
 
 
 # ---------------------------------------------------------------------------
-# Lazy cache
+# Dataset loader
 # ---------------------------------------------------------------------------
 
-_data: Dict[str, Optional[pd.DataFrame]] = {
-    "wo_events": None,
-    "events": None,
-    "alert_events": None,
-    "alert_rule": None,
-    "alert_rule_fc_mapping": None,
-    "anomaly_fc_mapping": None,
-    "failure_codes": None,
-    "primary_failure_codes": None,
-    "component": None,
+# Date columns that must be converted from ISO strings after fetch
+_DATE_COLS: Dict[str, List[str]] = {
+    "wo_events": ["actual_finish"],
+    "events": ["event_time"],
+    "alert_events": ["start_time", "end_time"],
 }
 
 
-def load(key: str) -> Optional[pd.DataFrame]:
-    """Return the cached DataFrame for *key*, loading it on first call."""
-    if _data[key] is not None:
-        return _data[key]
+def load(dataset: str) -> Optional[pd.DataFrame]:
+    """Fetch all documents with ``_dataset == dataset`` and return a DataFrame.
 
-    _loaders = {
-        "wo_events": _read_wo_events,
-        "events": _read_events,
-        "alert_events": _read_alert_events,
-        "alert_rule": lambda: pd.read_csv(_csv("alert_rule.csv"), dtype=str),
-        "alert_rule_fc_mapping": lambda: pd.read_csv(_csv("alert_rule_failure_code_mapping.csv"), dtype=str),
-        "anomaly_fc_mapping": lambda: pd.read_csv(_csv("anomaly_to_failure_code_mapping.csv"), dtype=str),
-        "failure_codes": lambda: pd.read_csv(_csv("failure_codes.csv"), dtype=str),
-        "primary_failure_codes": lambda: pd.read_csv(_csv("primary_failure_codes.csv"), dtype=str),
-        "component": lambda: pd.read_csv(_csv("component.csv"), dtype=str),
-    }
-
+    Returns ``None`` when CouchDB is unavailable or the dataset is empty.
+    """
+    db = _get_db()
+    if db is None:
+        return None
     try:
-        df = _loaders[key]()
-        _data[key] = df
-        logger.info("Loaded dataset '%s'", key)
+        result = db.find(
+            selector={"_dataset": {"$eq": dataset}},
+            limit=100_000,
+        )
+        docs = result.get("docs", [])
+        if not docs:
+            logger.warning("No documents found for dataset '%s'", dataset)
+            return None
+
+        df = pd.DataFrame(docs)
+        # Drop internal CouchDB fields
+        df.drop(columns=[c for c in ("_id", "_rev", "_dataset") if c in df.columns], inplace=True)
+
+        # Parse date columns
+        for col in _DATE_COLS.get(dataset, []):
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], errors="coerce")
+
+        logger.info("Loaded %d rows for dataset '%s'", len(df), dataset)
         return df
-    except FileNotFoundError:
-        logger.warning("Data file for '%s' not found in %s", key, WO_DATA_DIR)
-        return None
     except Exception as exc:
-        logger.error("Failed to load '%s': %s", key, exc)
+        logger.error("Failed to load dataset '%s': %s", dataset, exc)
         return None
-
-
-# ---------------------------------------------------------------------------
-# CSV readers
-# ---------------------------------------------------------------------------
-
-
-def _read_wo_events() -> pd.DataFrame:
-    df = pd.read_csv(_csv("all_wo_with_code_component_events.csv"), dtype=str)
-    df["actual_finish"] = pd.to_datetime(df["actual_finish"], format="%m/%d/%y %H:%M", errors="coerce")
-    return df
-
-
-def _read_events() -> pd.DataFrame:
-    df = pd.read_csv(_csv("event.csv"), dtype=str)
-    df["event_time"] = pd.to_datetime(df["event_time"], format="%Y-%m-%d %H:%M:%S", errors="coerce")
-    return df
-
-
-def _read_alert_events() -> pd.DataFrame:
-    df = pd.read_csv(_csv("alert_events.csv"), dtype=str)
-    df["start_time"] = pd.to_datetime(df["start_time"], format="%m/%d/%y %H:%M", errors="coerce")
-    df["end_time"] = pd.to_datetime(df["end_time"], format="%m/%d/%y %H:%M", errors="coerce")
-    return df
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +108,7 @@ def _read_alert_events() -> pd.DataFrame:
 
 
 def filter_df(df: pd.DataFrame, conditions: dict) -> pd.DataFrame:
-    """Filter *df* by a dict of ``{column: callable_or_query_string}`` conditions."""
+    """Filter *df* by a dict of ``{column: callable}`` conditions."""
     filtered = df.copy()
     for col, cond in conditions.items():
         if callable(cond):

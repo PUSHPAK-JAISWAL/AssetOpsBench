@@ -358,7 +358,7 @@ def analyze_alert_to_failure(
 
     cond: dict = {
         "equipment_id": lambda x, eid=equipment_id: isinstance(x, str) and x.strip().lower() == eid.strip().lower(),
-        "rule": lambda x, rid=rule_id: isinstance(x, str) and x.strip().lower() == rid.strip().lower(),
+        "rule_id": lambda x, rid=rule_id: isinstance(x, str) and x.strip().lower() == rid.strip().lower(),
     }
     filtered = filter_df(alert_df, cond)
     if filtered is None or filtered.empty:
@@ -369,7 +369,7 @@ def analyze_alert_to_failure(
     transitions: List[str] = []
     time_diffs: List[float] = []
     for i in range(len(filtered) - 1):
-        if str(filtered.iloc[i].get("rule", "")).strip().lower() == rule_id.strip().lower():
+        if str(filtered.iloc[i].get("rule_id", "")).strip().lower() == rule_id.strip().lower():
             for j in range(i + 1, len(filtered)):
                 if str(filtered.iloc[j].get("event_group", "")).upper() == "WORK_ORDER":
                     transitions.append("WORK_ORDER")

@@ -7,7 +7,7 @@ gated by the ``requires_wo_data`` marker.
 
 import pytest
 from servers.wo.main import mcp
-from .conftest import requires_wo_data, call_tool
+from .conftest import requires_couchdb, call_tool
 
 
 # ---------------------------------------------------------------------------
@@ -52,7 +52,7 @@ class TestGetWorkOrders:
         for field in ("wo_id", "wo_description", "primary_code", "preventive", "equipment_id"):
             assert field in wo
 
-    @requires_wo_data
+    @requires_couchdb
     @pytest.mark.anyio
     async def test_integration_cwc04013_2017(self):
         data = await call_tool(
@@ -82,7 +82,7 @@ class TestGetPreventiveWorkOrders:
         data = await call_tool(mcp, "get_preventive_work_orders", {"equipment_id": "UNKNOWN"})
         assert "error" in data
 
-    @requires_wo_data
+    @requires_couchdb
     @pytest.mark.anyio
     async def test_integration(self):
         data = await call_tool(
@@ -113,7 +113,7 @@ class TestGetCorrectiveWorkOrders:
         data = await call_tool(mcp, "get_corrective_work_orders", {"equipment_id": "UNKNOWN"})
         assert "error" in data
 
-    @requires_wo_data
+    @requires_couchdb
     @pytest.mark.anyio
     async def test_integration(self):
         data = await call_tool(
@@ -153,7 +153,7 @@ class TestGetEvents:
         )
         assert data["total"] == 2
 
-    @requires_wo_data
+    @requires_couchdb
     @pytest.mark.anyio
     async def test_integration(self):
         data = await call_tool(mcp, "get_events", {"equipment_id": "CWC04009"})
@@ -181,7 +181,7 @@ class TestGetFailureCodes:
         for field in ("category", "primary_code", "primary_code_description", "secondary_code"):
             assert field in fc
 
-    @requires_wo_data
+    @requires_couchdb
     @pytest.mark.anyio
     async def test_integration(self):
         data = await call_tool(mcp, "get_failure_codes", {})
@@ -214,7 +214,7 @@ class TestGetWorkOrderDistribution:
         counts = [e["count"] for e in data["distribution"]]
         assert counts == sorted(counts, reverse=True)
 
-    @requires_wo_data
+    @requires_couchdb
     @pytest.mark.anyio
     async def test_integration(self):
         data = await call_tool(
@@ -253,7 +253,7 @@ class TestPredictNextWorkOrder:
             total = sum(p["probability"] for p in data["predictions"])
             assert abs(total - 1.0) < 1e-6
 
-    @requires_wo_data
+    @requires_couchdb
     @pytest.mark.anyio
     async def test_integration(self):
         data = await call_tool(mcp, "predict_next_work_order", {"equipment_id": "CWC04013"})
@@ -290,7 +290,7 @@ class TestAnalyzeAlertToFailure:
             total_prob = sum(t["probability"] for t in data["transitions"])
             assert abs(total_prob - 1.0) < 1e-6
 
-    @requires_wo_data
+    @requires_couchdb
     @pytest.mark.anyio
     async def test_integration(self):
         data = await call_tool(
