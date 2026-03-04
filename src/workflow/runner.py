@@ -54,7 +54,7 @@ class PlanExecuteRunner:
         server_paths: Override MCP server specs.  Keys must match the agent
                       names the planner will assign steps to.  Values are
                       either a uv entry-point name (str) or a Path to a
-                      script file.  Defaults to all four registered servers.
+                      script file.  Defaults to all five registered servers.
     """
 
     def __init__(
