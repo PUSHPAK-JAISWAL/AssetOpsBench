@@ -1,7 +1,7 @@
 """Data access helpers for the Work Order MCP server.
 
 Reads from a CouchDB ``workorder`` database populated by ``src/couchdb/init_wo.py``.
-Each document carries a ``_dataset`` field that acts as a collection discriminator.
+Each document carries a ``dataset`` field that acts as a collection discriminator.
 
 Connection is established lazily on first use.  If CouchDB is unavailable the
 helpers return ``None`` / empty results so the server can still start.
@@ -78,7 +78,7 @@ def load(dataset: str) -> Optional[pd.DataFrame]:
         return None
     try:
         result = db.find(
-            selector={"_dataset": {"$eq": dataset}},
+            selector={"dataset": {"$eq": dataset}},
             limit=100_000,
         )
         docs = result.get("docs", [])
@@ -88,7 +88,7 @@ def load(dataset: str) -> Optional[pd.DataFrame]:
 
         df = pd.DataFrame(docs)
         # Drop internal CouchDB fields
-        df.drop(columns=[c for c in ("_id", "_rev", "_dataset") if c in df.columns], inplace=True)
+        df.drop(columns=[c for c in ("_id", "_rev", "dataset") if c in df.columns], inplace=True)
 
         # Parse date columns
         for col in _DATE_COLS.get(dataset, []):

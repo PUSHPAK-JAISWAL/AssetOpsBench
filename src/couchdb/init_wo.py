@@ -70,11 +70,11 @@ _DATASETS = [
 
 # Mango indexes to create: list of field-lists
 _INDEXES = [
-    ["_dataset", "equipment_id"],
-    ["_dataset", "actual_finish"],
-    ["_dataset", "event_time"],
-    ["_dataset", "rule_id"],
-    ["_dataset", "primary_code"],
+    ["dataset", "equipment_id"],
+    ["dataset", "actual_finish"],
+    ["dataset", "event_time"],
+    ["dataset", "rule_id"],
+    ["dataset", "primary_code"],
 ]
 
 # ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ def _bulk_insert(db_name: str, docs: list, batch_size: int = 500) -> None:
 
 def _row_to_doc(row: dict, dataset: str, date_cols: dict) -> dict:
     """Convert a CSV row dict to a CouchDB document dict."""
-    doc: dict = {"_dataset": dataset}
+    doc: dict = {"dataset": dataset}
     for k, v in row.items():
         if pd.isna(v):
             doc[k] = None
