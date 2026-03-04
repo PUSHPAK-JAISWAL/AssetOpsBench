@@ -156,21 +156,24 @@ def history(
     site_name: str, asset_id: str, start: str, final: Optional[str] = None
 ) -> Union[HistoryResult, ErrorResult]:
     """Returns a list of historical sensor values for the specified asset(s) at a site within a given time range (start to final)."""
-    if not db:
-        return ErrorResult(error="CouchDB not connected")
-
     try:
-        selector = {
-            "asset_id": asset_id,
-            "timestamp": {"$gte": datetime.fromisoformat(start).isoformat()},
-        }
-
+        start_iso = datetime.fromisoformat(start).isoformat()
         if final:
-            selector["timestamp"]["$lt"] = datetime.fromisoformat(final).isoformat()
+            datetime.fromisoformat(final)
             if start >= final:
                 return ErrorResult(error="start >= final")
     except ValueError as e:
         return ErrorResult(error=f"Invalid date format: {e}")
+
+    if not db:
+        return ErrorResult(error="CouchDB not connected")
+
+    selector = {
+        "asset_id": asset_id,
+        "timestamp": {"$gte": start_iso},
+    }
+    if final:
+        selector["timestamp"]["$lt"] = datetime.fromisoformat(final).isoformat()
 
     logger.info(f"Querying CouchDB with selector: {selector}")
     try:

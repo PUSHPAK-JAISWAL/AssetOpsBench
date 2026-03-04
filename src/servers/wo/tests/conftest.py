@@ -11,9 +11,22 @@ load_dotenv()
 
 # --- Custom markers ---
 
+
+def _couchdb_reachable() -> bool:
+    url = os.environ.get("COUCHDB_URL")
+    if not url:
+        return False
+    try:
+        import requests
+        requests.get(url, timeout=2)
+        return True
+    except Exception:
+        return False
+
+
 requires_couchdb = pytest.mark.skipif(
-    not os.environ.get("COUCHDB_URL"),
-    reason="CouchDB not configured (set COUCHDB_URL)",
+    not _couchdb_reachable(),
+    reason="CouchDB not reachable (set COUCHDB_URL and ensure CouchDB is running)",
 )
 
 
