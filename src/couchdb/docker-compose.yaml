@@ -5,42 +5,20 @@ services:
       COUCHDB_USERNAME: admin
       COUCHDB_PASSWORD: password
       COUCHDB_DBNAME: chiller
+      WO_COUCHDB_DBNAME: workorder
     ports:
       - "5984:5984"
     volumes:
       - couchdb-data:/opt/couchdb/data
       - ./couchdb_setup.sh:/opt/couchdb/etc/couchdb_setup.sh
+      - ./sample_data:/sample_data
+      - ./:/couchdb
     command: ["sh", "/opt/couchdb/etc/couchdb_setup.sh"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5984/"]
       interval: 10s
       timeout: 5s
       retries: 10
-
-  db-init:
-    image: python:3.12-slim
-    depends_on:
-      couchdb:
-        condition: service_healthy
-    environment:
-      COUCHDB_URL: http://couchdb:5984
-      COUCHDB_USERNAME: admin
-      COUCHDB_PASSWORD: password
-      COUCHDB_DBNAME: chiller
-      WO_COUCHDB_DBNAME: workorder
-    volumes:
-      - ./sample_data:/sample_data
-      - ../..:/app
-    working_dir: /app
-    command:
-      - sh
-      - -c
-      - |
-        pip install -q requests pandas python-dotenv &&
-        python -m src.couchdb.init_asset_data
-          --data-file /sample_data/chiller6_june2020_sensordata_couchdb.json &&
-        python -m src.couchdb.init_wo
-          --data-dir /sample_data/work_order
 
 volumes:
   couchdb-data:
