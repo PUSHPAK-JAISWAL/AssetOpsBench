@@ -24,6 +24,7 @@ dependencies = [
     "pyyaml>=6.0",
     "litellm>=1.0",
     "python-dotenv>=1.0",
+    "scipy>=1.10.0",
 ]
 
 [project.scripts]
@@ -33,6 +34,7 @@ utilities-mcp-server = "servers.utilities.main:main"
 fmsr-mcp-server = "servers.fmsr.main:main"
 tsfm-mcp-server = "servers.tsfm.main:main"
 wo-mcp-server = "servers.wo.main:main"
+vibration-mcp-server = "servers.vibration.main:main"
 
 
 [dependency-groups]
