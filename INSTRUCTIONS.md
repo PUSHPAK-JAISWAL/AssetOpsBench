@@ -76,36 +76,7 @@ Verify CouchDB is running:
 curl -X GET http://localhost:5984/
 ```
 
-### 4. Verify servers
-
-Run the smoke-test script to confirm all MCP servers can be imported and list their tools:
-
-```bash
-./scripts/start_servers.sh
-```
-
-Expected output:
-
-```
-================================================
- AssetOpsBench MCP server check
-================================================
-
-  [OK] utilities-mcp-server
-       tools: json_reader,current_date_time,current_time_english
-  [OK] iot-mcp-server
-       tools: sites,assets,sensors,history
-  [OK] fmsr-mcp-server
-       tools: get_failure_modes,get_failure_mode_sensor_mapping
-  [OK] tsfm-mcp-server
-       tools: get_ai_tasks,get_tsfm_models,run_tsfm_forecasting,...
-  [OK] wo-mcp-server
-       tools: get_work_orders,get_preventive_work_orders,...
-
-================================================
- 5 passed  |  0 failed
-================================================
-```
+### 4. Run servers
 
 > **Note:** MCP servers use stdio transport — they are spawned on-demand by clients (Claude Desktop, `plan-execute`) and exit when the client disconnects. They are not long-running daemons.
 
