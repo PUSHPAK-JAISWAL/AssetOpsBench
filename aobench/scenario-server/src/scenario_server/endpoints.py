@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import uuid
 
@@ -223,18 +224,23 @@ async def fetch_scenario(scenario_set_id: str, tracking: bool = False) -> dict:
     if tracking and TRACKING_URI:
         logger.info(f"{tracking=} and {TRACKING_URI=}")
 
-        mlflow.set_experiment(experiment_name=f"{title}")
-        with mlflow.start_run(run_name=f"{uuid.uuid4()}") as run:
-            experiment_id = run.info.experiment_id
-            run_id = run.info.run_id
+        def mlflow_start_run(scenario_set_title):
+            mlflow.set_experiment(experiment_name=f"{scenario_set_title}")
+            with mlflow.start_run(run_name=f"{uuid.uuid4()}") as run:
+                experiment_id = run.info.experiment_id
+                run_id = run.info.run_id
+
+                return experiment_id, run_id
+
+        eid, rid = await asyncio.to_thread(mlflow_start_run, title)
 
         return {
             "title": title,
             "scenarios": scenario_set,
             "tracking_context": {
                 "uri": TRACKING_URI,
-                "experiment_id": experiment_id,
-                "run_id": run_id,
+                "experiment_id": eid,
+                "run_id": rid,
             },
         }
 
