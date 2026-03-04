@@ -7,7 +7,7 @@ Environment variables (or .env):
     COUCHDB_URL        e.g. http://localhost:5984
     COUCHDB_USERNAME   admin user
     COUCHDB_PASSWORD   admin password
-    COUCHDB_DBNAME     target database (default: chiller)
+    IOT_DBNAME         target database (default: chiller)
     ASSET_DATA_FILE    override JSON file path
 """
 
@@ -38,7 +38,7 @@ _DEFAULT_DATA_FILE = os.path.join(
 COUCHDB_URL = os.environ.get("COUCHDB_URL", "http://localhost:5984")
 COUCHDB_USERNAME = os.environ.get("COUCHDB_USERNAME", "admin")
 COUCHDB_PASSWORD = os.environ.get("COUCHDB_PASSWORD", "password")
-COUCHDB_DBNAME = os.environ.get("COUCHDB_DBNAME", "chiller")
+IOT_DBNAME = os.environ.get("IOT_DBNAME", "chiller")
 ASSET_DATA_FILE = os.environ.get("ASSET_DATA_FILE", _DEFAULT_DATA_FILE)
 
 _AUTH = (COUCHDB_USERNAME, COUCHDB_PASSWORD)
@@ -107,7 +107,7 @@ def _bulk_insert(db_name: str, docs: list, batch_size: int = 500) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Initialize CouchDB IoT asset database from JSON.")
     parser.add_argument("--data-file", default=ASSET_DATA_FILE, help="Path to sensor data JSON file")
-    parser.add_argument("--db", default=COUCHDB_DBNAME, help="CouchDB database name")
+    parser.add_argument("--db", default=IOT_DBNAME, help="CouchDB database name")
     parser.add_argument("--drop", action="store_true", help="Drop and recreate database if it exists")
     args = parser.parse_args()
 

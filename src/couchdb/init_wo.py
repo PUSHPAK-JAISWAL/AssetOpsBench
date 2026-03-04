@@ -7,7 +7,7 @@ Environment variables (or .env):
     COUCHDB_URL        e.g. http://localhost:5984
     COUCHDB_USERNAME   admin user
     COUCHDB_PASSWORD   admin password
-    WO_COUCHDB_DBNAME  target database (default: workorder)
+    WO_DBNAME  target database (default: workorder)
     WO_DATA_DIR        override CSV directory
 """
 
@@ -36,7 +36,7 @@ _DEFAULT_DATA_DIR = os.path.join(_SCRIPT_DIR, "sample_data", "work_order")
 COUCHDB_URL = os.environ.get("COUCHDB_URL", "http://localhost:5984")
 COUCHDB_USERNAME = os.environ.get("COUCHDB_USERNAME", "admin")
 COUCHDB_PASSWORD = os.environ.get("COUCHDB_PASSWORD", "password")
-WO_COUCHDB_DBNAME = os.environ.get("WO_COUCHDB_DBNAME", "workorder")
+WO_DBNAME = os.environ.get("WO_DBNAME", "workorder")
 WO_DATA_DIR = os.environ.get("WO_DATA_DIR", _DEFAULT_DATA_DIR)
 
 # ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ def load_dataset(data_dir: str, csv_file: str, dataset: str, date_cols: dict) ->
 def main() -> None:
     parser = argparse.ArgumentParser(description="Initialize CouchDB work-order database from CSVs.")
     parser.add_argument("--data-dir", default=WO_DATA_DIR, help="Directory containing CSVs")
-    parser.add_argument("--db", default=WO_COUCHDB_DBNAME, help="CouchDB database name")
+    parser.add_argument("--db", default=WO_DBNAME, help="CouchDB database name")
     parser.add_argument("--drop", action="store_true", help="Drop and recreate database if it exists")
     args = parser.parse_args()
 

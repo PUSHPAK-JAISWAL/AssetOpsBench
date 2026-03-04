@@ -17,7 +17,7 @@ logger = logging.getLogger("iot-mcp-server")
 
 # Configuration from environment
 COUCHDB_URL = os.environ.get("COUCHDB_URL")
-COUCHDB_DBNAME = os.environ.get("COUCHDB_DBNAME")
+COUCHDB_DBNAME = os.environ.get("IOT_DBNAME")
 COUCHDB_USER = os.environ.get("COUCHDB_USERNAME")
 COUCHDB_PASSWORD = os.environ.get("COUCHDB_PASSWORD")
 

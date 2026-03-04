@@ -15,7 +15,7 @@ COUCHDB_URL = os.environ.get("COUCHDB_URL", "")
 COUCHDB_HOST = COUCHDB_URL.replace("http://", "").replace("https://", "")
 COUCHDB_USER = os.environ.get("COUCHDB_USERNAME", "")
 COUCHDB_PASS = os.environ.get("COUCHDB_PASSWORD", "")
-COUCHDB_DBNAME = os.environ.get("COUCHDB_DBNAME", "")
+COUCHDB_DBNAME = os.environ.get("IOT_DBNAME", "")
 
 FULL_URL = f"http://{COUCHDB_USER}:{COUCHDB_PASS}@{COUCHDB_HOST}"
 

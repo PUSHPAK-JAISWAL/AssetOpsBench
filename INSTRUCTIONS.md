@@ -93,7 +93,7 @@ uv run tsfm-mcp-server
 | Variable | Required | Description |
 |---|---|---|
 | `COUCHDB_URL` | IoT server | CouchDB connection URL, e.g. `http://localhost:5984` |
-| `COUCHDB_DBNAME` | IoT server | Database name (default fixture: `chiller`) |
+| `IOT_DBNAME` | IoT server | Database name (default fixture: `chiller`) |
 | `COUCHDB_USERNAME` | IoT server | CouchDB admin username |
 | `COUCHDB_PASSWORD` | IoT server | CouchDB admin password |
 | `WATSONX_APIKEY` | `--platform watsonx` | IBM WatsonX API key |
@@ -112,7 +112,7 @@ uv run tsfm-mcp-server
 ### IoTAgent
 
 **Path:** `src/servers/iot/main.py`
-**Requires:** CouchDB (`COUCHDB_URL`, `COUCHDB_DBNAME`, `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`)
+**Requires:** CouchDB (`COUCHDB_URL`, `IOT_DBNAME`, `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`)
 
 | Tool | Arguments | Description |
 |---|---|---|

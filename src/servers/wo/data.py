@@ -26,7 +26,7 @@ logger = logging.getLogger("wo-mcp-server")
 COUCHDB_URL: str = os.environ.get("COUCHDB_URL", "http://localhost:5984")
 COUCHDB_USERNAME: str = os.environ.get("COUCHDB_USERNAME", "admin")
 COUCHDB_PASSWORD: str = os.environ.get("COUCHDB_PASSWORD", "password")
-WO_COUCHDB_DBNAME: str = os.environ.get("WO_COUCHDB_DBNAME", "workorder")
+WO_DBNAME: str = os.environ.get("WO_DBNAME", "workorder")
 
 # ---------------------------------------------------------------------------
 # Lazy connection
@@ -44,12 +44,12 @@ def _get_db():
         import couchdb3  # lazy import so the server starts without couchdb3 installed
 
         _db = couchdb3.Database(
-            WO_COUCHDB_DBNAME,
+            WO_DBNAME,
             url=COUCHDB_URL,
             user=COUCHDB_USERNAME,
             password=COUCHDB_PASSWORD,
         )
-        logger.info("Connected to CouchDB database '%s'", WO_COUCHDB_DBNAME)
+        logger.info("Connected to CouchDB database '%s'", WO_DBNAME)
     except Exception as exc:
         logger.error("Failed to connect to CouchDB: %s", exc)
         _db = None

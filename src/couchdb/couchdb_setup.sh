@@ -26,13 +26,13 @@ echo "Loading IoT asset data..."
 COUCHDB_URL="http://localhost:5984" \
   python3 /couchdb/init_asset_data.py \
     --data-file /sample_data/chiller6_june2020_sensordata_couchdb.json \
-    --db "${COUCHDB_DBNAME:-chiller}"
+    --db "${IOT_DBNAME:-chiller}"
 
 echo "Loading work order data..."
 COUCHDB_URL="http://localhost:5984" \
   python3 /couchdb/init_wo.py \
     --data-dir /sample_data/work_order \
-    --db "${WO_COUCHDB_DBNAME:-workorder}"
+    --db "${WO_DBNAME:-workorder}"
 
 echo "✅ All databases initialised."
 tail -f /dev/null

@@ -4,8 +4,8 @@ services:
     environment:
       COUCHDB_USERNAME: admin
       COUCHDB_PASSWORD: password
-      COUCHDB_DBNAME: chiller
-      WO_COUCHDB_DBNAME: workorder
+      IOT_DBNAME: chiller
+      WO_DBNAME: workorder
     ports:
       - "5984:5984"
     volumes:
