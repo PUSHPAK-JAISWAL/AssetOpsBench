@@ -76,9 +76,40 @@ Verify CouchDB is running:
 curl -X GET http://localhost:5984/
 ```
 
-### 4. Run servers locally
+### 4. Verify servers
 
-Use `uv run` to start the MCP servers (paths relative to repo root):
+Run the smoke-test script to confirm all MCP servers can be imported and list their tools:
+
+```bash
+./scripts/start_servers.sh
+```
+
+Expected output:
+
+```
+================================================
+ AssetOpsBench MCP server check
+================================================
+
+  [OK] utilities-mcp-server
+       tools: json_reader,current_date_time,current_time_english
+  [OK] iot-mcp-server
+       tools: sites,assets,sensors,history
+  [OK] fmsr-mcp-server
+       tools: get_failure_modes,get_failure_mode_sensor_mapping
+  [OK] tsfm-mcp-server
+       tools: get_ai_tasks,get_tsfm_models,run_tsfm_forecasting,...
+  [OK] wo-mcp-server
+       tools: get_work_orders,get_preventive_work_orders,...
+
+================================================
+ 5 passed  |  0 failed
+================================================
+```
+
+> **Note:** MCP servers use stdio transport — they are spawned on-demand by clients (Claude Desktop, `plan-execute`) and exit when the client disconnects. They are not long-running daemons.
+
+To start a server manually for testing:
 
 ```bash
 uv run utilities-mcp-server
@@ -150,7 +181,7 @@ uv run wo-mcp-server
 
 **Path:** `src/servers/wo/main.py`
 **Requires:** CouchDB (`COUCHDB_URL`, `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`, `WO_DBNAME`)
-**Data init:** `python -m src.couchdb.init_wo` (or `docker compose -f src/couchdb/docker-compose.yaml up`)
+**Data init:** Handled automatically by `docker compose -f src/couchdb/docker-compose.yaml up` (runs `src/couchdb/init_wo.py` inside the CouchDB container on first start)
 
 | Tool | Arguments | Description |
 |---|---|---|
@@ -210,6 +241,8 @@ After `uv sync`, the `plan-execute` command is available:
 uv run plan-execute "What assets are available at site MAIN?"
 ```
 
+> **Note:** `plan-execute` spawns MCP servers on-demand for each query — you do **not** need to start them manually first. Servers are launched as subprocesses, used, then exit automatically.
+
 Flags:
 
 | Flag | Description |
@@ -243,10 +276,32 @@ uv run plan-execute --model-id litellm_proxy/GCP/claude-4-sonnet "What are the f
 uv run plan-execute --show-history --json "How many observations exist for CH-1?" | jq .answer
 ```
 
-### End-to-end example
+### End-to-end examples
 
 All five servers (IoTAgent, Utilities, FMSRAgent, TSFMAgent, WorkOrderAgent) are registered by default.
-Run a question that exercises three of them with independent parallel steps:
+
+#### Work order queries (requires CouchDB + populated `workorder` db)
+
+Equipment IDs in the sample dataset: `CWC04014` (524 WOs), `CWC04013` (431 WOs), `CWC04009` (alert events).
+
+```bash
+# Work order count and most common failure code
+uv run plan-execute "How many work orders does equipment CWC04014 have, and what is the most common failure code?"
+
+# Preventive vs corrective split
+uv run plan-execute "For equipment CWC04013, how many preventive vs corrective work orders were completed?"
+
+# Alert-to-failure probability
+uv run plan-execute "What is the probability that alert rule RUL0018 on equipment CWC04009 leads to a work order, and how long does it typically take?"
+
+# Work order distribution + next prediction (multi-step)
+uv run plan-execute --show-plan --show-history \
+  "For equipment CWC04014, show the work order distribution and predict the next maintenance type"
+```
+
+#### Multi-server parallel query
+
+Run a question that exercises three servers with independent parallel steps:
 
 ```bash
 uv run plan-execute --show-plan --show-history \
@@ -429,8 +484,8 @@ uv run pytest src/ -v
 │                   │ stdio      │                     │
 └───────────────────┼────────────┼─────────────────────┘
                     │ MCP protocol (stdio)
-         ┌──────────┼──────────┬──────────┐
-         ▼          ▼          ▼          ▼          ▼
+         ┌──────────┼──────────┬──────────┬──────────────┐
+         ▼          ▼          ▼          ▼              ▼
       IoTAgent   Utilities   FMSRAgent  TSFMAgent  WorkOrderAgent
-      (tools)    (tools)     (tools)    (tools)    (tools)
+      (tools)    (tools)     (tools)    (tools)       (tools)
 ```
