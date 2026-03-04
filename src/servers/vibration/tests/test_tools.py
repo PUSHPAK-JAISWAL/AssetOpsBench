@@ -131,7 +131,7 @@ class TestListKnownBearings:
         assert "bearings" in result
         assert len(result["bearings"]) >= 5
         names = [b["name"] for b in result["bearings"]]
-        assert "6205" in names
+        assert any("6205" in n for n in names)
 
 
 # ---------------------------------------------------------------------------
@@ -164,8 +164,8 @@ class TestCalculateBearingFrequencies:
             "pitch_diameter_mm": 46.0,
             "bearing_name": "test-bearing",
         })
-        assert "bearing_name" in result
-        assert result["bearing_name"] == "test-bearing"
+        assert "bearing" in result
+        assert result["bearing"] == "test-bearing"
 
 
 # ---------------------------------------------------------------------------

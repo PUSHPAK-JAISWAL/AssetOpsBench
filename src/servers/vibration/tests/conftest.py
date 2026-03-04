@@ -46,5 +46,12 @@ def reset_data_store():
 
 async def call_tool(mcp_instance, tool_name: str, args: dict) -> dict:
     """Helper: call an MCP tool and return parsed JSON response."""
-    contents, _ = await mcp_instance.call_tool(tool_name, args)
+    result = await mcp_instance.call_tool(tool_name, args)
+    # FastMCP may return (contents, is_error) tuple or just the contents list
+    if isinstance(result, tuple):
+        contents = result[0]
+    else:
+        contents = result
+    if isinstance(contents, dict):
+        return contents
     return json.loads(contents[0].text)
