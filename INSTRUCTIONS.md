@@ -12,6 +12,7 @@ This directory contains the MCP servers and infrastructure for the AssetOpsBench
   - [Utilities](#utilities)
   - [FMSRAgent](#fmsragent)
   - [TSFMAgent](#tsfmagent)
+  - [WorkOrderAgent](#workorderagent)
 - [Plan-Execute Runner](#plan-execute-runner)
   - [How it works](#how-it-works)
   - [CLI](#cli)
@@ -84,6 +85,7 @@ uv run utilities-mcp-server
 uv run iot-mcp-server
 uv run fmsr-mcp-server
 uv run tsfm-mcp-server
+uv run wo-mcp-server
 ```
 
 ---
@@ -92,10 +94,11 @@ uv run tsfm-mcp-server
 
 | Variable | Required | Description |
 |---|---|---|
-| `COUCHDB_URL` | IoT server | CouchDB connection URL, e.g. `http://localhost:5984` |
-| `IOT_DBNAME` | IoT server | Database name (default fixture: `chiller`) |
-| `COUCHDB_USERNAME` | IoT server | CouchDB admin username |
-| `COUCHDB_PASSWORD` | IoT server | CouchDB admin password |
+| `COUCHDB_URL` | IoT + WO servers | CouchDB connection URL, e.g. `http://localhost:5984` |
+| `COUCHDB_USERNAME` | IoT + WO servers | CouchDB admin username |
+| `COUCHDB_PASSWORD` | IoT + WO servers | CouchDB admin password |
+| `IOT_DBNAME` | IoT server | IoT sensor database name (default: `chiller`) |
+| `WO_DBNAME` | WO server | Work order database name (default: `workorder`) |
 | `WATSONX_APIKEY` | `--platform watsonx` | IBM WatsonX API key |
 | `WATSONX_PROJECT_ID` | `--platform watsonx` | IBM WatsonX project ID |
 | `WATSONX_URL` | `--platform watsonx` | WatsonX endpoint (optional; defaults to `https://us-south.ml.cloud.ibm.com`) |
@@ -112,7 +115,7 @@ uv run tsfm-mcp-server
 ### IoTAgent
 
 **Path:** `src/servers/iot/main.py`
-**Requires:** CouchDB (`COUCHDB_URL`, `IOT_DBNAME`, `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`)
+**Requires:** CouchDB (`COUCHDB_URL`, `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`, `IOT_DBNAME`)
 
 | Tool | Arguments | Description |
 |---|---|---|
@@ -142,6 +145,23 @@ uv run tsfm-mcp-server
 |---|---|---|
 | `get_failure_modes` | `asset_name` | Return known failure modes for an asset. Uses a curated YAML list for chillers and AHUs; falls back to the LLM for other types. |
 | `get_failure_mode_sensor_mapping` | `asset_name`, `failure_modes`, `sensors` | For each (failure mode, sensor) pair, determine relevancy via LLM. Returns bidirectional `fm→sensors` and `sensor→fms` maps plus full per-pair details. |
+
+### WorkOrderAgent
+
+**Path:** `src/servers/wo/main.py`
+**Requires:** CouchDB (`COUCHDB_URL`, `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`, `WO_DBNAME`)
+**Data init:** `python -m src.couchdb.init_wo` (or `docker compose -f src/couchdb/docker-compose.yaml up`)
+
+| Tool | Arguments | Description |
+|---|---|---|
+| `get_work_orders` | `equipment_id`, `start_date?`, `end_date?` | Retrieve all work orders for an equipment within an optional date range |
+| `get_preventive_work_orders` | `equipment_id`, `start_date?`, `end_date?` | Retrieve only preventive (PM) work orders |
+| `get_corrective_work_orders` | `equipment_id`, `start_date?`, `end_date?` | Retrieve only corrective (CM) work orders |
+| `get_events` | `equipment_id`, `start_date?`, `end_date?` | Retrieve all events (work orders, alerts, anomalies) |
+| `get_failure_codes` | — | List all failure codes with categories and descriptions |
+| `get_work_order_distribution` | `equipment_id`, `start_date?`, `end_date?` | Count work orders per (primary, secondary) failure code pair, sorted by frequency |
+| `predict_next_work_order` | `equipment_id`, `start_date?`, `end_date?` | Predict next work order type via Markov transition matrix built from historical sequence |
+| `analyze_alert_to_failure` | `equipment_id`, `rule_id`, `start_date?`, `end_date?` | Probability that an alert rule leads to a work order; average hours to maintenance |
 
 ### TSFMAgent
 
@@ -225,7 +245,7 @@ uv run plan-execute --show-history --json "How many observations exist for CH-1?
 
 ### End-to-end example
 
-All four servers (IoTAgent, Utilities, FMSRAgent, TSFMAgent) are registered by default.
+All five servers (IoTAgent, Utilities, FMSRAgent, TSFMAgent, WorkOrderAgent) are registered by default.
 Run a question that exercises three of them with independent parallel steps:
 
 ```bash
@@ -334,6 +354,10 @@ Add the following to your Claude Desktop `claude_desktop_config.json`:
     "TSFMAgent": {
       "command": "/path/to/uv",
       "args": ["run", "--project", "/path/to/AssetOpsBench", "tsfm-mcp-server"]
+    },
+    "WorkOrderAgent": {
+      "command": "/path/to/uv",
+      "args": ["run", "--project", "/path/to/AssetOpsBench", "wo-mcp-server"]
     }
   }
 }
@@ -351,6 +375,7 @@ uv run pytest src/ -v
 
 Integration tests are auto-skipped when the required service is not available:
 - IoT integration tests require `COUCHDB_URL` (set in `.env`)
+- Work order integration tests require `COUCHDB_URL` (set in `.env`)
 - FMSR integration tests require `WATSONX_APIKEY` (set in `.env`)
 - TSFM integration tests require `PATH_TO_MODELS_DIR` and `PATH_TO_DATASETS_DIR` (set in `.env`)
 
@@ -367,7 +392,15 @@ uv run pytest src/servers/iot/tests/test_tools.py -k "not integration"
 uv run pytest src/servers/utilities/tests/
 uv run pytest src/servers/fmsr/tests/ -k "not integration"
 uv run pytest src/servers/tsfm/tests/ -k "not integration"
+uv run pytest src/servers/wo/tests/test_tools.py -k "not integration"
 uv run pytest src/workflow/tests/
+```
+
+### Work order integration tests (requires CouchDB + populated `workorder` db)
+
+```bash
+docker compose -f src/couchdb/docker-compose.yaml up -d
+uv run pytest src/servers/wo/tests/test_integration.py -v
 ```
 
 ### Integration tests (requires CouchDB + WatsonX)
@@ -397,7 +430,7 @@ uv run pytest src/ -v
 └───────────────────┼────────────┼─────────────────────┘
                     │ MCP protocol (stdio)
          ┌──────────┼──────────┬──────────┐
-         ▼          ▼          ▼          ▼
-      IoTAgent   Utilities   FMSRAgent  TSFMAgent
-      (tools)    (tools)     (tools)    (tools)
+         ▼          ▼          ▼          ▼          ▼
+      IoTAgent   Utilities   FMSRAgent  TSFMAgent  WorkOrderAgent
+      (tools)    (tools)     (tools)    (tools)    (tools)
 ```
