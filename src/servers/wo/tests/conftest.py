@@ -2,6 +2,7 @@ import json
 import os
 
 import pytest
+import pandas as pd
 from unittest.mock import patch
 
 from dotenv import load_dotenv
@@ -13,14 +14,14 @@ load_dotenv()
 requires_wo_data = pytest.mark.skipif(
     not os.path.exists(
         os.environ.get(
-            "WO_DATA_PATH",
+            "WO_DATA_DIR",
             os.path.join(
                 os.path.dirname(__file__),
-                "../../../../tmp/assetopsbench/sample_data/all_wo_with_code_component_events.csv",
+                "../../../../tmp/assetopsbench/sample_data",
             ),
         )
     ),
-    reason="Work order CSV data not available (set WO_DATA_PATH)",
+    reason="Work order sample data directory not found (set WO_DATA_DIR)",
 )
 
 
@@ -29,21 +30,15 @@ requires_wo_data = pytest.mark.skipif(
 
 @pytest.fixture(autouse=True)
 def reset_data_cache():
-    """Reset the module-level DataFrame cache between tests."""
+    """Reset the module-level data cache between tests."""
     import servers.wo.main as wo_main
-    original = wo_main._df
-    wo_main._df = None
+    original = dict(wo_main._data)
+    wo_main._data = {k: None for k in original}
     yield
-    wo_main._df = original
+    wo_main._data = original
 
 
-@pytest.fixture
-def mock_df(tmp_path):
-    """Patch the WO data path with a minimal CSV fixture."""
-    import pandas as pd
-    import servers.wo.main as wo_main
-
-    csv_path = tmp_path / "wo_test.csv"
+def _make_wo_df() -> pd.DataFrame:
     data = {
         "wo_id": ["WO001", "WO002", "WO003", "WO004"],
         "wo_description": ["Oil Analysis", "Routine Maintenance", "Corrective Repair", "Emergency Fix"],
@@ -54,18 +49,91 @@ def mock_df(tmp_path):
         "secondary_code_description": ["Routine Oil Analysis", "Basic Maint", "Repair", "Emergency"],
         "equipment_id": ["CWC04013", "CWC04013", "CWC04013", "CWC04007"],
         "equipment_name": ["Chiller 13", "Chiller 13", "Chiller 13", "Chiller 7"],
-        "preventive": [True, True, False, False],
-        "work_priority": [5, 5, 3, 1],
-        "actual_finish": ["2017-06-01", "2017-08-15", "2017-11-20", "2018-03-10"],
+        "preventive": ["TRUE", "TRUE", "FALSE", "FALSE"],
+        "work_priority": ["5", "5", "3", "1"],
+        "actual_finish": [
+            pd.Timestamp("2017-06-01"),
+            pd.Timestamp("2017-08-15"),
+            pd.Timestamp("2017-11-20"),
+            pd.Timestamp("2018-03-10"),
+        ],
         "duration": ["3:00", "2:00", "4:00", "6:00"],
         "actual_labor_hours": ["1:00", "1:00", "2:00", "3:00"],
     }
-    pd.DataFrame(data).to_csv(csv_path, index=False)
+    return pd.DataFrame(data)
 
-    with patch.object(wo_main, "WO_DATA_PATH", str(csv_path)):
-        wo_main._df = None
-        yield
-        wo_main._df = None
+
+def _make_events_df() -> pd.DataFrame:
+    data = {
+        "event_id": ["E001", "E002", "E003"],
+        "event_group": ["WORK_ORDER", "ALERT", "ANOMALY"],
+        "event_category": ["PM", "ALERT", "ANOMALY"],
+        "event_type": ["MT001", "CR00002", None],
+        "description": ["Routine Maintenance", "Temperature Alert", "Anomaly Detected"],
+        "equipment_id": ["CWC04013", "CWC04013", "CWC04013"],
+        "equipment_name": ["Chiller 13", "Chiller 13", "Chiller 13"],
+        "event_time": [
+            pd.Timestamp("2017-06-01"),
+            pd.Timestamp("2017-07-01"),
+            pd.Timestamp("2017-08-01"),
+        ],
+        "note": [None, "High temp", None],
+    }
+    return pd.DataFrame(data)
+
+
+def _make_failure_codes_df() -> pd.DataFrame:
+    data = {
+        "category": ["Maintenance and Routine Checks", "Maintenance and Routine Checks", "Corrective"],
+        "primary_code": ["MT010", "MT001", "MT013"],
+        "primary_code_description": ["Oil Analysis", "Routine Maintenance", "Corrective"],
+        "secondary_code": ["MT010b", "MT001a", "MT013a"],
+        "secondary_code_description": ["Routine Oil Analysis", "Basic Maint", "Repair"],
+    }
+    return pd.DataFrame(data)
+
+
+def _make_primary_failure_codes_df() -> pd.DataFrame:
+    data = {
+        "category": ["Maintenance and Routine Checks", "Maintenance and Routine Checks", "Corrective"],
+        "primary_code": ["MT010", "MT001", "MT013"],
+        "primary_code_description": ["Oil Analysis", "Routine Maintenance", "Corrective"],
+    }
+    return pd.DataFrame(data)
+
+
+def _make_alert_events_df() -> pd.DataFrame:
+    data = {
+        "equipment_id": ["CWC04013", "CWC04013", "CWC04013"],
+        "equipment_name": ["Chiller 13", "Chiller 13", "Chiller 13"],
+        "rule": ["CR00002", "CR00002", "CR00002"],
+        "start_time": [
+            pd.Timestamp("2017-01-01"),
+            pd.Timestamp("2017-03-01"),
+            pd.Timestamp("2017-06-01"),
+        ],
+        "end_time": [
+            pd.Timestamp("2017-01-02"),
+            pd.Timestamp("2017-03-02"),
+            pd.Timestamp("2017-06-02"),
+        ],
+        "event_group": ["ALERT", "ALERT", "WORK_ORDER"],
+    }
+    return pd.DataFrame(data)
+
+
+@pytest.fixture
+def mock_data():
+    """Patch all module-level data caches with minimal fixture DataFrames."""
+    import servers.wo.main as wo_main
+
+    wo_main._data["wo_events"] = _make_wo_df()
+    wo_main._data["events"] = _make_events_df()
+    wo_main._data["failure_codes"] = _make_failure_codes_df()
+    wo_main._data["primary_failure_codes"] = _make_primary_failure_codes_df()
+    wo_main._data["alert_events"] = _make_alert_events_df()
+    yield
+    wo_main._data = {k: None for k in wo_main._data}
 
 
 async def call_tool(mcp_instance, tool_name: str, args: dict) -> dict:

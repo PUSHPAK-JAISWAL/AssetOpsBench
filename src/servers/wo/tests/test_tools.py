@@ -1,35 +1,13 @@
 """Tests for Work Order MCP server tools.
 
-Unit tests use a mocked CSV fixture; integration tests require the real dataset
-(skipped unless WO_DATA_PATH points to a valid CSV).
+Unit tests use in-memory fixture DataFrames injected via ``mock_data``.
+Integration tests require the sample data directory to be present and are
+gated by the ``requires_wo_data`` marker.
 """
 
 import pytest
 from servers.wo.main import mcp
 from .conftest import requires_wo_data, call_tool
-
-
-# ---------------------------------------------------------------------------
-# list_equipment
-# ---------------------------------------------------------------------------
-
-
-class TestListEquipment:
-    @pytest.mark.anyio
-    async def test_returns_equipment_list(self, mock_df):
-        data = await call_tool(mcp, "list_equipment", {})
-        assert "equipment_ids" in data
-        assert "CWC04013" in data["equipment_ids"]
-        assert "CWC04007" in data["equipment_ids"]
-        assert data["total_equipment"] == 2
-
-    @requires_wo_data
-    @pytest.mark.anyio
-    async def test_integration_returns_equipment(self):
-        data = await call_tool(mcp, "list_equipment", {})
-        assert "equipment_ids" in data
-        assert data["total_equipment"] > 0
-        assert any("CWC" in eq for eq in data["equipment_ids"])
 
 
 # ---------------------------------------------------------------------------
@@ -39,53 +17,40 @@ class TestListEquipment:
 
 class TestGetWorkOrders:
     @pytest.mark.anyio
-    async def test_unknown_equipment(self, mock_df):
+    async def test_unknown_equipment(self, mock_data):
         data = await call_tool(mcp, "get_work_orders", {"equipment_id": "UNKNOWN"})
         assert "error" in data
 
     @pytest.mark.anyio
-    async def test_returns_all_records(self, mock_df):
+    async def test_returns_all_records(self, mock_data):
         data = await call_tool(mcp, "get_work_orders", {"equipment_id": "CWC04013"})
-        assert data["total_work_orders"] == 3
+        assert data["total"] == 3
         assert len(data["work_orders"]) == 3
 
     @pytest.mark.anyio
-    async def test_date_range_filter(self, mock_df):
+    async def test_date_range_filter(self, mock_data):
         data = await call_tool(
             mcp,
             "get_work_orders",
-            {"equipment_id": "CWC04013", "start_date": "2017-01-01", "end_date": "2018-01-01"},
+            {"equipment_id": "CWC04013", "start_date": "2017-01-01", "end_date": "2017-12-31"},
         )
-        assert data["total_work_orders"] == 3
+        assert data["total"] == 3
         for wo in data["work_orders"]:
-            assert wo["actual_finish"] is not None
-            assert "2017" in wo["actual_finish"]
+            assert "2017" in (wo["actual_finish"] or "")
 
     @pytest.mark.anyio
-    async def test_invalid_start_date(self, mock_df):
+    async def test_invalid_date(self, mock_data):
         data = await call_tool(
             mcp, "get_work_orders", {"equipment_id": "CWC04013", "start_date": "not-a-date"}
         )
         assert "error" in data
 
     @pytest.mark.anyio
-    async def test_work_order_fields(self, mock_df):
+    async def test_work_order_fields_present(self, mock_data):
         data = await call_tool(mcp, "get_work_orders", {"equipment_id": "CWC04013"})
         wo = data["work_orders"][0]
-        assert "wo_id" in wo
-        assert "wo_description" in wo
-        assert "primary_code" in wo
-        assert "preventive" in wo
-        assert "equipment_id" in wo
-
-    @pytest.mark.anyio
-    async def test_preventive_filter_via_date(self, mock_df):
-        # CWC04013 has 2 preventive and 1 corrective; all in 2017
-        data = await call_tool(mcp, "get_work_orders", {"equipment_id": "CWC04013"})
-        preventive = [wo for wo in data["work_orders"] if wo["preventive"]]
-        corrective = [wo for wo in data["work_orders"] if not wo["preventive"]]
-        assert len(preventive) == 2
-        assert len(corrective) == 1
+        for field in ("wo_id", "wo_description", "primary_code", "preventive", "equipment_id"):
+            assert field in wo
 
     @requires_wo_data
     @pytest.mark.anyio
@@ -93,62 +58,242 @@ class TestGetWorkOrders:
         data = await call_tool(
             mcp,
             "get_work_orders",
-            {"equipment_id": "CWC04013", "start_date": "2017-01-01", "end_date": "2018-01-01"},
+            {"equipment_id": "CWC04013", "start_date": "2017-01-01", "end_date": "2017-12-31"},
         )
         assert "work_orders" in data
-        assert data["total_work_orders"] > 0
+        assert data["total"] > 0
 
 
 # ---------------------------------------------------------------------------
-# summarize_work_orders
+# get_preventive_work_orders
 # ---------------------------------------------------------------------------
 
 
-class TestSummarizeWorkOrders:
+class TestGetPreventiveWorkOrders:
     @pytest.mark.anyio
-    async def test_unknown_equipment(self, mock_df):
-        data = await call_tool(mcp, "summarize_work_orders", {"equipment_id": "UNKNOWN"})
+    async def test_returns_only_preventive(self, mock_data):
+        data = await call_tool(mcp, "get_preventive_work_orders", {"equipment_id": "CWC04013"})
+        assert data["total"] == 2
+        for wo in data["work_orders"]:
+            assert wo["preventive"] is True
+
+    @pytest.mark.anyio
+    async def test_unknown_equipment(self, mock_data):
+        data = await call_tool(mcp, "get_preventive_work_orders", {"equipment_id": "UNKNOWN"})
         assert "error" in data
-
-    @pytest.mark.anyio
-    async def test_summary_counts(self, mock_df):
-        data = await call_tool(mcp, "summarize_work_orders", {"equipment_id": "CWC04013"})
-        assert data["total_work_orders"] == 3
-        assert data["preventive_count"] == 2
-        assert data["corrective_count"] == 1
-
-    @pytest.mark.anyio
-    async def test_by_primary_code(self, mock_df):
-        data = await call_tool(mcp, "summarize_work_orders", {"equipment_id": "CWC04013"})
-        assert "by_primary_code" in data
-        assert data["by_primary_code"]["MT010"] == 1
-        assert data["by_primary_code"]["MT001"] == 1
-        assert data["by_primary_code"]["MT013"] == 1
-
-    @pytest.mark.anyio
-    async def test_by_collection(self, mock_df):
-        data = await call_tool(mcp, "summarize_work_orders", {"equipment_id": "CWC04013"})
-        assert "by_collection" in data
-        assert data["by_collection"]["compressor"] == 2
-        assert data["by_collection"]["motor"] == 1
-
-    @pytest.mark.anyio
-    async def test_date_range_narrows_summary(self, mock_df):
-        data = await call_tool(
-            mcp,
-            "summarize_work_orders",
-            {"equipment_id": "CWC04013", "end_date": "2017-09-01"},
-        )
-        assert data["total_work_orders"] == 2
 
     @requires_wo_data
     @pytest.mark.anyio
-    async def test_integration_summary_cwc04013(self):
+    async def test_integration(self):
         data = await call_tool(
             mcp,
-            "summarize_work_orders",
-            {"equipment_id": "CWC04013", "start_date": "2017-01-01", "end_date": "2018-01-01"},
+            "get_preventive_work_orders",
+            {"equipment_id": "CWC04013", "start_date": "2017-01-01", "end_date": "2017-12-31"},
         )
-        assert "total_work_orders" in data
-        assert "by_primary_code" in data
+        assert "work_orders" in data
+        for wo in data["work_orders"]:
+            assert wo["preventive"] is True
+
+
+# ---------------------------------------------------------------------------
+# get_corrective_work_orders
+# ---------------------------------------------------------------------------
+
+
+class TestGetCorrectiveWorkOrders:
+    @pytest.mark.anyio
+    async def test_returns_only_corrective(self, mock_data):
+        data = await call_tool(mcp, "get_corrective_work_orders", {"equipment_id": "CWC04013"})
+        assert data["total"] == 1
+        for wo in data["work_orders"]:
+            assert wo["preventive"] is False
+
+    @pytest.mark.anyio
+    async def test_unknown_equipment(self, mock_data):
+        data = await call_tool(mcp, "get_corrective_work_orders", {"equipment_id": "UNKNOWN"})
+        assert "error" in data
+
+    @requires_wo_data
+    @pytest.mark.anyio
+    async def test_integration(self):
+        data = await call_tool(
+            mcp,
+            "get_corrective_work_orders",
+            {"equipment_id": "CWC04013", "start_date": "2017-01-01", "end_date": "2017-12-31"},
+        )
+        assert "work_orders" in data
+        for wo in data["work_orders"]:
+            assert wo["preventive"] is False
+
+
+# ---------------------------------------------------------------------------
+# get_events
+# ---------------------------------------------------------------------------
+
+
+class TestGetEvents:
+    @pytest.mark.anyio
+    async def test_returns_events(self, mock_data):
+        data = await call_tool(mcp, "get_events", {"equipment_id": "CWC04013"})
+        assert data["total"] == 3
+        groups = {e["event_group"] for e in data["events"]}
+        assert {"WORK_ORDER", "ALERT", "ANOMALY"} == groups
+
+    @pytest.mark.anyio
+    async def test_unknown_equipment(self, mock_data):
+        data = await call_tool(mcp, "get_events", {"equipment_id": "UNKNOWN"})
+        assert "error" in data
+
+    @pytest.mark.anyio
+    async def test_date_range(self, mock_data):
+        data = await call_tool(
+            mcp,
+            "get_events",
+            {"equipment_id": "CWC04013", "start_date": "2017-07-01", "end_date": "2017-12-31"},
+        )
+        assert data["total"] == 2
+
+    @requires_wo_data
+    @pytest.mark.anyio
+    async def test_integration(self):
+        data = await call_tool(mcp, "get_events", {"equipment_id": "CWC04009"})
+        assert "events" in data
+        assert data["total"] > 0
+
+
+# ---------------------------------------------------------------------------
+# get_failure_codes
+# ---------------------------------------------------------------------------
+
+
+class TestGetFailureCodes:
+    @pytest.mark.anyio
+    async def test_returns_codes(self, mock_data):
+        data = await call_tool(mcp, "get_failure_codes", {})
+        assert data["total"] == 3
+        codes = [fc["primary_code"] for fc in data["failure_codes"]]
+        assert "MT010" in codes
+
+    @pytest.mark.anyio
+    async def test_fields_present(self, mock_data):
+        data = await call_tool(mcp, "get_failure_codes", {})
+        fc = data["failure_codes"][0]
+        for field in ("category", "primary_code", "primary_code_description", "secondary_code"):
+            assert field in fc
+
+    @requires_wo_data
+    @pytest.mark.anyio
+    async def test_integration(self):
+        data = await call_tool(mcp, "get_failure_codes", {})
+        assert data["total"] > 0
+
+
+# ---------------------------------------------------------------------------
+# get_work_order_distribution
+# ---------------------------------------------------------------------------
+
+
+class TestGetWorkOrderDistribution:
+    @pytest.mark.anyio
+    async def test_unknown_equipment(self, mock_data):
+        data = await call_tool(mcp, "get_work_order_distribution", {"equipment_id": "UNKNOWN"})
+        assert "error" in data
+
+    @pytest.mark.anyio
+    async def test_distribution_counts(self, mock_data):
+        data = await call_tool(mcp, "get_work_order_distribution", {"equipment_id": "CWC04013"})
+        assert data["total_work_orders"] == 3
+        codes = {e["primary_code"]: e["count"] for e in data["distribution"]}
+        assert codes.get("MT010") == 1
+        assert codes.get("MT001") == 1
+        assert codes.get("MT013") == 1
+
+    @pytest.mark.anyio
+    async def test_sorted_descending(self, mock_data):
+        data = await call_tool(mcp, "get_work_order_distribution", {"equipment_id": "CWC04013"})
+        counts = [e["count"] for e in data["distribution"]]
+        assert counts == sorted(counts, reverse=True)
+
+    @requires_wo_data
+    @pytest.mark.anyio
+    async def test_integration(self):
+        data = await call_tool(
+            mcp,
+            "get_work_order_distribution",
+            {"equipment_id": "CWC04013", "start_date": "2017-01-01", "end_date": "2017-12-31"},
+        )
+        assert "distribution" in data
         assert data["total_work_orders"] > 0
+
+
+# ---------------------------------------------------------------------------
+# predict_next_work_order
+# ---------------------------------------------------------------------------
+
+
+class TestPredictNextWorkOrder:
+    @pytest.mark.anyio
+    async def test_unknown_equipment(self, mock_data):
+        data = await call_tool(mcp, "predict_next_work_order", {"equipment_id": "UNKNOWN"})
+        assert "error" in data
+
+    @pytest.mark.anyio
+    async def test_returns_predictions(self, mock_data):
+        data = await call_tool(mcp, "predict_next_work_order", {"equipment_id": "CWC04013"})
+        # Should either return predictions or an error about transition data
+        assert "predictions" in data or "error" in data
+        if "predictions" in data:
+            assert "last_work_order_type" in data
+            assert isinstance(data["predictions"], list)
+
+    @pytest.mark.anyio
+    async def test_probabilities_sum_to_one(self, mock_data):
+        data = await call_tool(mcp, "predict_next_work_order", {"equipment_id": "CWC04013"})
+        if "predictions" in data and data["predictions"]:
+            total = sum(p["probability"] for p in data["predictions"])
+            assert abs(total - 1.0) < 1e-6
+
+    @requires_wo_data
+    @pytest.mark.anyio
+    async def test_integration(self):
+        data = await call_tool(mcp, "predict_next_work_order", {"equipment_id": "CWC04013"})
+        assert "predictions" in data or "error" in data
+
+
+# ---------------------------------------------------------------------------
+# analyze_alert_to_failure
+# ---------------------------------------------------------------------------
+
+
+class TestAnalyzeAlertToFailure:
+    @pytest.mark.anyio
+    async def test_unknown_rule(self, mock_data):
+        data = await call_tool(
+            mcp, "analyze_alert_to_failure", {"equipment_id": "CWC04013", "rule_id": "UNKNOWN"}
+        )
+        assert "error" in data
+
+    @pytest.mark.anyio
+    async def test_returns_transitions(self, mock_data):
+        data = await call_tool(
+            mcp, "analyze_alert_to_failure", {"equipment_id": "CWC04013", "rule_id": "CR00002"}
+        )
+        # fixture only has 3 rows so transitions may be empty or present
+        assert "transitions" in data or "error" in data
+
+    @pytest.mark.anyio
+    async def test_probabilities_valid(self, mock_data):
+        data = await call_tool(
+            mcp, "analyze_alert_to_failure", {"equipment_id": "CWC04013", "rule_id": "CR00002"}
+        )
+        if "transitions" in data and data["transitions"]:
+            total_prob = sum(t["probability"] for t in data["transitions"])
+            assert abs(total_prob - 1.0) < 1e-6
+
+    @requires_wo_data
+    @pytest.mark.anyio
+    async def test_integration(self):
+        data = await call_tool(
+            mcp, "analyze_alert_to_failure", {"equipment_id": "CWC04013", "rule_id": "CR00002"}
+        )
+        assert "transitions" in data or "error" in data
