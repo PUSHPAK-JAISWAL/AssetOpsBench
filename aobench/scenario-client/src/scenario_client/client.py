@@ -297,11 +297,13 @@ class AOBench:
                 except Exception as ex:
                     logger.error(f"failed to associate trace to run: {ex}")
 
+                mlflow.end_run()
+
             else:
                 result = await afunc(**kwargs)
 
             if post_process:
-                result = post_process(result)
+                result: str = post_process(result)
 
             logger.debug(f"{result=}")
 
@@ -362,7 +364,8 @@ class AOBench:
             if tracking_context:
                 rid: str = tracking_context.run_id
 
-                mlflow.start_run(run_id=rid)
+                if not mlflow.active_run():
+                    mlflow.start_run(run_id=rid)
 
                 if run_name != "":
                     mlflow.set_tag("mlflow.runName", run_name)
@@ -387,11 +390,12 @@ class AOBench:
                     logger.error(f"failed to associate trace to run: {ex}")
 
                 mlflow.end_run()
+
             else:
                 result = func(**kwargs)
 
             if post_process:
-                result = post_process(result)
+                result: str = post_process(result)
 
             logger.debug(f"{result=}")
 
