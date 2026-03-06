@@ -479,7 +479,7 @@ class AOBench:
                     logger.info(f"{tracking_uri=} / {experiment_id=} / {run_id=}")
 
                     mlflow.set_tracking_uri(uri=tracking_uri)
-                    mlflow.langchain.autolog()
+                    mlflow.autolog()
                     mlflow.set_experiment(experiment_id=experiment_id)
                     mlflow.start_run(run_id=run_id)
 
