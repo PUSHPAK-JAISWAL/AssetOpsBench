@@ -5,6 +5,7 @@ import string
 import time
 
 from litestar import Litestar, Request, get
+from litestar.logging import LoggingConfig
 from litestar.middleware import DefineMiddleware
 from litestar.openapi.config import OpenAPIConfig
 from litestar.response import Redirect
@@ -37,14 +38,26 @@ class RequestTimingMiddleware:
             rid: str = "".join(random.choices(bag, k=12))
             request.state["rid"] = rid
 
-            logger.info(f"[{rid}] > request: {request.url.path} {request.client}")
+            rc = request.client
+            rp = request.url.path
+
+            logger.info(f"[{rid}] > request: {rp} {rc}")
+
             t1: float = time.perf_counter()
 
-            await self.app(scope, receive, send)
+            async def send_wrapper(message):
+                if message["type"] == "http.response.body" and not message.get(
+                    "more_body", False
+                ):
+                    t3: float = time.perf_counter() - t1
+                    logger.info(f"[{rid}] < response-bg: {rp} {rc} ~ {t3:0.5f}")
 
-            logger.info(
-                f"[{rid}] < response: {request.url.path}  {time.perf_counter() - t1:0.5f}"
-            )
+                await send(message)
+
+            await self.app(scope, receive, send_wrapper)
+            t2: float = time.perf_counter() - t1
+
+            logger.info(f"[{rid}] < response+bg: {rp} {rc} ~ {t2:0.5f}")
         else:
             await self.app(scope, receive, send)
 
@@ -107,6 +120,16 @@ def get_app(
 
     openapi_cfg: OpenAPIConfig = openapi_config or OPENAPI_CONFIG
 
+    logging_config = LoggingConfig(
+        root={"level": "INFO", "handlers": ["queue_listener"]},
+        formatters={
+            "standard": {
+                "format": "[%(levelname)1.1s %(asctime)s %(filename)-24s:%(lineno)5d] :: %(message)s"
+            }
+        },
+        log_exceptions="always",
+    )
+
     app = Litestar(
         debug=debug,
         middleware=[DefineMiddleware(RequestTimingMiddleware)],
@@ -114,6 +137,7 @@ def get_app(
         openapi_config=openapi_cfg,
         on_startup=[startup],
         on_shutdown=[shutdown],
+        logging_config=logging_config,
     )
 
     return app

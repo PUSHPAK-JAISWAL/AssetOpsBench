@@ -156,37 +156,6 @@ class SSLConfig:
 _default_config: SSLConfig = SSLConfig.from_env()
 
 
-def tag_latest_trace(experiment_id, run_id, scenario_id):
-    """Tag the latest MLflow trace with a scenario ID.
-
-    Searches for the most recent trace in the specified experiment and run,
-    then tags it with the provided scenario_id for tracking purposes.
-
-    Args:
-        experiment_id (str): MLflow experiment ID
-        run_id (str): MLflow run ID
-        scenario_id (str): Scenario identifier to tag the trace with
-
-    Note:
-        If no traces or multiple traces are found, the operation is skipped
-        and an error is logged.
-    """
-    traces = mlflow.search_traces(
-        experiment_ids=[experiment_id],
-        run_id=run_id,
-        order_by=["timestamp_ms DESC"],
-        max_results=1,
-    )
-
-    if len(traces) == 1:
-        current_trace_id = list(traces.trace_id)[0]
-        mlflow.set_trace_tag(
-            trace_id=current_trace_id, key="scenario_id", value=scenario_id
-        )
-    else:
-        logger.error(f"found {len(traces)=}, ignoring")
-
-
 class AOBench:
     """Client for interacting with scenario servers and running benchmarks.
 
@@ -285,17 +254,33 @@ class AOBench:
         """
         try:
             if tracking_context:
+                rid: str = tracking_context.run_id
+
+                if not mlflow.active_run():
+                    mlflow.start_run(run_id=rid)
+
                 if run_name != "":
                     mlflow.set_tag("mlflow.runName", run_name)
 
-                with mlflow.start_span(name=scenario_id):
+                trace_id: str | None = None
+                with mlflow.start_span(name=scenario_id) as span:
                     result = await afunc(**kwargs)
 
-                tag_latest_trace(
-                    experiment_id=tracking_context.experiment_id,
-                    run_id=tracking_context.run_id,
-                    scenario_id=scenario_id,
-                )
+                    trace_id = span.trace_id
+
+                try:
+                    if trace_id is None:
+                        raise ValueError("failed to identify trace id")
+
+                    mlflow.set_trace_tag(
+                        trace_id=trace_id, key="mlflow.runId", value=rid
+                    )
+                    mlflow.set_trace_tag(
+                        trace_id=trace_id, key="scenario_id", value=scenario_id
+                    )
+                except Exception as ex:
+                    logger.error(f"failed to associate trace to run: {ex}")
+
             else:
                 result = await afunc(**kwargs)
 
@@ -359,17 +344,33 @@ class AOBench:
         """
         try:
             if tracking_context:
+                rid: str = tracking_context.run_id
+
+                mlflow.start_run(run_id=rid)
+
                 if run_name != "":
                     mlflow.set_tag("mlflow.runName", run_name)
 
-                with mlflow.start_span(name=scenario_id):
+                trace_id: str | None = None
+                with mlflow.start_span(name=scenario_id) as span:
                     result = func(**kwargs)
 
-                tag_latest_trace(
-                    experiment_id=tracking_context.experiment_id,
-                    run_id=tracking_context.run_id,
-                    scenario_id=scenario_id,
-                )
+                    trace_id = span.trace_id
+
+                try:
+                    if trace_id is None:
+                        raise ValueError("failed to identify trace id")
+
+                    mlflow.set_trace_tag(
+                        trace_id=trace_id, key="mlflow.runId", value=rid
+                    )
+                    mlflow.set_trace_tag(
+                        trace_id=trace_id, key="scenario_id", value=scenario_id
+                    )
+                except Exception as ex:
+                    logger.error(f"failed to associate trace to run: {ex}")
+
+                mlflow.end_run()
             else:
                 result = func(**kwargs)
 

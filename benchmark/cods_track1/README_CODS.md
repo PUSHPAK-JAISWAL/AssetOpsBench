@@ -31,9 +31,9 @@ A fork lets you experiment and make changes without affecting the original proje
 
 The repository contains multiple branches, but for this purpose you will only use:
 
-- **`Competition_CODS`** → this branch contains the competition-specific code and materials.
+- **`main`** → this branch contains the competition-specific code and materials.
 
-👉 You still need to fork with **all branches** available so you can access `Competition_CODS`.
+👉 You still need to fork with **all branches** available so you can access `main`.
 
 ---
 
@@ -46,34 +46,34 @@ The repository contains multiple branches, but for this purpose you will only us
    - Make sure your own GitHub account is selected as the destination.
    - **Important:** Uncheck the option **“Copy the `main` branch only.”**
      - Leaving it checked will copy only `main`.
-     - Unchecking ensures you also get **`Competition_CODS`** and other branches.
+     - Unchecking ensures you also get **`main`** and other branches.
 
 3. Click **Create fork**.
 
 ---
 
-### Step 5 — Switch to the `Competition_CODS` Branch
+### Step 5 — Switch to the `main` Branch
 
 1. Go to your forked repository:  
    👉 `https://github.com/<your-username>/AssetOpsBench`
 
 2. Open the **Branch dropdown menu** (upper-left, just above the file list).
-3. Select **`Competition_CODS`** from the list.
+3. Select **`main`** from the list.
    - This switches your forked repository view to the competition branch.
 
 ---
 
 ### Step 6 — Verify Your Fork
 
-- After switching, confirm that the branch name `Competition_CODS` is shown at the top-left of the repository.
+- After switching, confirm that the branch name `main` is shown at the top-left of the repository.
 - All further work for the competition should be done in this branch.
 
 ---
 
 ### Important Notes
 
-- Always uncheck **“Copy the `main` branch only”** when forking. Otherwise you won’t see `Competition_CODS`.
-- Even though other branches are copied, you only need to use **`Competition_CODS`** for this competition.
+- Always uncheck **“Copy the `main` branch only”** when forking. Otherwise you won’t see `main`.
+- Even though other branches are copied, you only need to use **`main`** for this competition.
 
 ## 2. Clone to Your Local Machine (Using GitHub Desktop)
 
@@ -106,24 +106,24 @@ Here we use **GitHub Desktop** to illustrate the process.
 2. Set the path to:
    local path: <your_local_directory>/codabench/AssetOpsBench
 
-### Step 4 — Switch to the `Competition_CODS` Branch
+### Step 4 — Switch to the `main` Branch
 
-⚠️ For this competition, you must work **only** on the `Competition_CODS` branch.
+⚠️ For this competition, you must work **only** on the `main` branch.
 
 1. In GitHub Desktop, use the **Current Branch** dropdown (top bar).
-2. Select `Competition_CODS` from the list.
+2. Select `main` from the list.
    - If you don’t see it, ensure you unchecked “Copy the main branch only” when you forked.
 
 ---
 
 ### Step 5 — Verify
 
-1. The branch name shown at the top of GitHub Desktop should be **Competition_CODS**.
+1. The branch name shown at the top of GitHub Desktop should be **main**.
 2. Confirm the file view matches the content of this branch.
 
 ---
 
-✅ You have successfully cloned your fork locally with GitHub Desktop and switched to the **`Competition_CODS`** branch. All further work should be done in this branch.
+✅ You have successfully cloned your fork locally with GitHub Desktop and switched to the **`main`** branch. All further work should be done in this branch.
 
 ## 3. Docker Setup (Vendor‑Agnostic — Rancher Desktop as Example)
 
@@ -198,7 +198,7 @@ kubectl cluster-info
 
 ## 4. Environment Variables
 
-You can use [.env](https://github.com/IBM/AssetOpsBench/blob/Competition_CODS/benchmark/cods_track1/.env) or add your environment variables to `.env` which can be passed to containers through `docker-compose.yml`.
+You can use [.env](https://github.com/IBM/AssetOpsBench/blob/main/benchmark/cods_track1/.env) or add your environment variables to `.env` which can be passed to containers through `docker-compose.yml`.
 
 Fill in your `.env.local` file with the following (Please see Notes, you do not need all the value to be filled.):
 
