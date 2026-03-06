@@ -481,7 +481,6 @@ class AOBench:
                     mlflow.set_tracking_uri(uri=tracking_uri)
                     mlflow.autolog()
                     mlflow.set_experiment(experiment_id=experiment_id)
-                    mlflow.start_run(run_id=run_id)
 
                     tracking_context = TrackingContext(
                         uri=tracking_uri, experiment_id=experiment_id, run_id=run_id
