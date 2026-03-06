@@ -18,6 +18,22 @@ logger: logging.Logger = logging.getLogger(__name__)
 __version__ = "1.0.0"
 
 
+def get_timeout() -> float:
+    """
+    Get the timeout value from the SCENARIO_CLIENT_TIMEOUT environment variable.
+    Maximum value is 180 seconds. Defaults to 30 seconds if not set or invalid.
+    """
+    try:
+        timeout = float(environ.get("SCENARIO_CLIENT_TIMEOUT", "30"))
+        # Ensure timeout doesn't exceed 180 seconds
+        return min(timeout, 180.0)
+    except (ValueError, TypeError):
+        logger.warning(
+            "Invalid SCENARIO_CLIENT_TIMEOUT value, using default of 30 seconds"
+        )
+        return 30.0
+
+
 @dataclass
 class TrackingContext:
     """MLflow tracking context for experiment tracking.
@@ -406,7 +422,10 @@ class AOBench:
             >>> print(types)
             {'types': [{'id': 'qa', 'name': 'Question Answering'}, ...]}
         """
-        with httpx.Client(verify=self.config.get_ssl_context()) as client:
+        timeout: float = get_timeout()
+        with httpx.Client(
+            verify=self.config.get_ssl_context(), timeout=timeout
+        ) as client:
             endpoint: str = f"{self.scenario_uri}/scenario-types"
             logger.debug(f"{endpoint=}")
 
@@ -446,7 +465,10 @@ class AOBench:
             ...     print(tracking.experiment_id)
             'exp-123'
         """
-        with httpx.Client(verify=self.config.get_ssl_context()) as client:
+        timeout: float = get_timeout()
+        with httpx.Client(
+            verify=self.config.get_ssl_context(), timeout=timeout
+        ) as client:
             endpoint: str = f"{self.scenario_uri}/scenario-set/{scenario_set_id}"
             logger.debug(f"{endpoint=}")
 
@@ -524,9 +546,10 @@ class AOBench:
             >>> print(results['score'])
             0.95
         """
+        timeout: float = get_timeout()
         with httpx.Client(
             verify=self.config.get_ssl_context(),
-            timeout=httpx.Timeout(connect=5.0, read=90.0, write=60.0, pool=5.0),
+            timeout=timeout,
         ) as client:
             endpoint: str = f"{self.scenario_uri}/scenario-set/{scenario_set_id}/grade"
             logger.debug(f"{endpoint=}")
@@ -586,7 +609,11 @@ class AOBench:
             >>> print(grading_id)
             'grading-abc123'
         """
-        with httpx.Client(verify=self.config.get_ssl_context()) as client:
+        timeout: float = get_timeout()
+        with httpx.Client(
+            verify=self.config.get_ssl_context(),
+            timeout=timeout,
+        ) as client:
             endpoint: str = (
                 f"{self.scenario_uri}/scenario-set/{scenario_set_id}/deferred-grading"
             )
@@ -634,7 +661,11 @@ class AOBench:
             >>> print(status['status'])
             'completed'
         """
-        with httpx.Client(verify=self.config.get_ssl_context()) as client:
+        timeout: float = get_timeout()
+        with httpx.Client(
+            verify=self.config.get_ssl_context(),
+            timeout=timeout,
+        ) as client:
             endpoint: str = f"{self.scenario_uri}/deferred-grading/{grading_id}/status"
             logger.debug(f"{endpoint=}")
 
@@ -666,7 +697,11 @@ class AOBench:
             >>> print(results['score'])
             0.95
         """
-        with httpx.Client(verify=self.config.get_ssl_context()) as client:
+        timeout: float = get_timeout()
+        with httpx.Client(
+            verify=self.config.get_ssl_context(),
+            timeout=timeout,
+        ) as client:
             endpoint: str = f"{self.scenario_uri}/deferred-grading/{grading_id}/result"
             logger.debug(f"{endpoint=}")
 
