@@ -15,6 +15,7 @@ from litestar.status_codes import (
     HTTP_404_NOT_FOUND,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
+from mlflow import MlflowClient
 from pydantic import BaseModel, Field
 from scenario_server.entities import (
     ScenarioGrade,
@@ -225,12 +226,24 @@ async def fetch_scenario(scenario_set_id: str, tracking: bool = False) -> dict:
         logger.info(f"{tracking=} and {TRACKING_URI=}")
 
         def mlflow_start_run(scenario_set_title):
-            mlflow.set_experiment(experiment_name=f"{scenario_set_title}")
-            with mlflow.start_run(run_name=f"{uuid.uuid4()}") as run:
-                experiment_id = run.info.experiment_id
-                run_id = run.info.run_id
+            client = MlflowClient()
 
-                return experiment_id, run_id
+            experiment = client.get_experiment_by_name(scenario_set_title)
+            if experiment is None:
+                experiment_id = client.create_experiment(scenario_set_title)
+            else:
+                experiment_id = experiment.experiment_id
+
+            run = client.create_run(
+                experiment_id=experiment_id,
+                run_name=f"{uuid.uuid4()}",
+            )
+            run_id = run.info.run_id
+
+            client.set_terminated(run_id=run_id)
+            logger.debug(f"{experiment_id=}, {run_id=}")
+
+            return experiment_id, run_id
 
         eid, rid = await asyncio.to_thread(mlflow_start_run, title)
 

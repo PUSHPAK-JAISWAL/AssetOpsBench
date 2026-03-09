@@ -2,7 +2,6 @@ import asyncio
 import logging
 import time
 
-import mlflow
 from mlflow import MlflowClient
 from mlflow.entities import Feedback as MLFlowFeedback
 from mlflow.entities.trace import Trace
@@ -10,7 +9,7 @@ from mlflow.store.entities.paged_list import PagedList
 from mlflow.tracing.assessment import log_assessment
 from mlflow.tracing.utils.search import traces_to_df
 from pandas import DataFrame
-from scenario_server.entities import ScenarioAnswer, SubmissionResult
+from scenario_server.entities import ScenarioAnswer, SubmissionResult, SubmissionSummary
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.debug(f"debug: {__name__}")
@@ -26,9 +25,6 @@ def mlflow_logging(
     try:
         experiment_id: str = tracking_context["experiment_id"]
         run_id: str = tracking_context["run_id"]
-
-        # mlflow.set_experiment(experiment_id=experiment_id)
-        # with mlflow.start_run(run_id=run_id):
 
         all_traces: list[Trace] = []
         page_token = None
@@ -97,10 +93,39 @@ def mlflow_logging(
                     logger.exception(f"failed to log assessment: {e=}")
 
         try:
-            for summary in results.summary:
-                k: str = summary.name
-                v: str = summary.value
-                client.set_tag(run_id=run_id, key=k, value=v)
+            original: list[SubmissionSummary] = results.summary
+
+            mlflow_tags: list[SubmissionSummary] = []
+            mlflow_log_metrics: list[SubmissionSummary] = []
+            mlflow_log_artifacts: list[SubmissionSummary] = []
+
+            for o in original:
+                k: str = o.name
+
+                if k == "mlflow_log_artifact":
+                    mlflow_log_artifacts.append(o)
+
+                elif k[: len("mlflow_log_metric_")] == "mlflow_log_metric_":
+                    n = k[len("mlflow_log_metric_") :]
+                    v = o.value
+                    mlflow_log_metrics.append(SubmissionSummary(name=n, value=v))
+
+                else:
+                    mlflow_tags.append(o)
+
+            for a in mlflow_log_artifacts:
+                client.log_artifact(run_id=run_id, local_path=a.value)
+
+            for m in mlflow_log_metrics:
+                client.log_metric(run_id=run_id, key=m.name, value=float(m.value))
+
+            for t in mlflow_tags:
+                client.set_tag(run_id=run_id, key=t.name, value=t.value)
+
+            # no point in returning mlflow_log_artifacts, since they are
+            # local (to the server) file paths
+            results.summary = mlflow_tags + mlflow_log_metrics
+
         except Exception as e:
             logger.exception(f"failed to set summary tag")
 
@@ -117,10 +142,7 @@ async def grade_responses(grader, data) -> SubmissionResult:
     tracking_context = data.get("tracking_context", None)
 
     if tracking_context:
-        run_id: str = tracking_context["run_id"]
-        with mlflow.start_run(run_id=run_id):
-            # allow for mlflow.active_run() in grader
-            results = await grader(submission)
+        results = await grader(submission)
 
         # mlflow uses blocking sends which can block the event loop
         await asyncio.to_thread(mlflow_logging, tracking_context, results)
