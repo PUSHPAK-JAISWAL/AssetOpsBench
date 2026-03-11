@@ -38,20 +38,20 @@
       "id": 306,
       "type": "Vibration",
       "text": "What is the vibration severity classification for a machine with an RMS velocity of 4.5 mm/s? It is a medium-sized machine on rigid foundations.",
-      "category": "ISO Assessment",
+      "category": "Condition Assessment",
       "characteristic_form": "The expected response should classify 4.5 mm/s as ISO 10816 Zone B (acceptable) for a group2 machine, with thresholds context."
     },
     {
       "id": 307,
       "type": "Vibration",
       "text": "Assess vibration severity for a large machine on flexible foundations with 12.0 mm/s RMS velocity.",
-      "category": "ISO Assessment",
+      "category": "Condition Assessment",
       "characteristic_form": "The expected response should classify 12.0 mm/s under group3 (large machine, flexible foundation) and determine the appropriate ISO 10816 zone."
     },
     {
       "id": 308,
       "type": "Vibration",
-      "text": "Fetch vibration sensor data from Chiller 6, sensor Current, starting from 2020-06-01.",
+      "text": "Fetch vibration sensor data from Chiller 6, sensor Current, from 2020-06-01 to 2020-06-07 at site MAIN.",
       "category": "Data Retrieval",
       "characteristic_form": "The expected response should load time-series data from CouchDB for asset 'Chiller 6', sensor 'Current', return a data_id, sample count, duration, and basic statistics (RMS, peak, mean)."
     },
@@ -65,78 +65,106 @@
     {
       "id": 310,
       "type": "Vibration",
-      "text": "Compute the FFT spectrum for the vibration data I just loaded.",
+      "text": "Compute the FFT spectrum for signal 'vib_001' and return the top 5 peak frequencies with amplitudes.",
       "category": "Signal Analysis",
-      "characteristic_form": "The expected response should provide the top frequency peaks with amplitudes, maximum amplitude and its frequency, RMS spectral value, frequency resolution, and total spectral bins."
+      "characteristic_form": "The expected response should provide the top 5 frequency peaks with amplitudes, maximum amplitude and its frequency, RMS spectral value, frequency resolution, and total spectral bins."
     },
     {
       "id": 311,
       "type": "Vibration",
-      "text": "Generate the FFT spectrum using a Blackman window for the loaded signal.",
+      "text": "Compute the FFT spectrum of signal 'vib_001' using a Blackman window and return the top 5 peaks.",
       "category": "Signal Analysis",
-      "characteristic_form": "The expected response should compute an FFT with a Blackman window and return peak frequencies, confirming the window type used."
+      "characteristic_form": "The expected response should compute an FFT with a Blackman window and return the top 5 peak frequencies with amplitudes, confirming the window type used."
     },
     {
       "id": 312,
       "type": "Vibration",
-      "text": "Perform envelope analysis on the vibration signal to look for bearing defect frequencies.",
+      "text": "Compute the envelope spectrum of signal 'vib_001' using a bandpass filter from 500 Hz to 1500 Hz (Hilbert transform) and return the top 5 peaks.",
       "category": "Signal Analysis",
-      "characteristic_form": "The expected response should compute the envelope spectrum using the Hilbert transform, optionally report the bandpass filter band, and show the dominant peaks in the demodulated spectrum."
+      "characteristic_form": "The expected response should compute the envelope spectrum using a 500-1500 Hz bandpass filter and Hilbert transform, and return the top 5 peak frequencies in the demodulated spectrum."
     },
     {
       "id": 313,
       "type": "Vibration",
-      "text": "Run a full vibration diagnosis on the loaded data at 1800 RPM with bearing 6205.",
+      "text": "Run a full vibration diagnosis on signal 'vib_001' at 1800 RPM with bearing 6205.",
       "category": "Diagnosis",
       "characteristic_form": "The expected response should include: shaft feature extraction (1x, 2x, 3x amplitudes), bearing fault frequency analysis using 6205 geometry, ISO 10816 severity assessment, fault classification (unbalance, misalignment, looseness, bearing), and a markdown diagnostic report."
     },
     {
       "id": 314,
       "type": "Vibration",
-      "text": "Diagnose the vibration signal at 3600 RPM using custom bearing geometry: 8 balls, 10.3 mm ball diameter, 46 mm pitch diameter.",
+      "text": "Diagnose signal 'vib_001' at 3600 RPM using custom bearing geometry: 8 balls, 10.3 mm ball diameter, 46 mm pitch diameter.",
       "category": "Diagnosis",
       "characteristic_form": "The expected response should perform full diagnosis including custom bearing frequency calculation, envelope analysis, shaft features, ISO 10816 assessment, and fault classification with a summary report."
     },
     {
       "id": 315,
       "type": "Vibration",
-      "text": "Run vibration diagnosis without RPM on the current data.",
+      "text": "Run vibration diagnosis without RPM on signal 'vib_001'.",
       "category": "Diagnosis",
       "characteristic_form": "The expected response should provide a partial diagnosis with a warning that shaft-frequency analysis was skipped, basic signal statistics (RMS, peak, crest factor, kurtosis), FFT summary, and ISO 10816 severity."
     },
     {
       "id": 316,
       "type": "Vibration",
-      "text": "Diagnose the vibration and provide the bearing fault frequencies directly: BPFO=87.5 Hz, BPFI=132.5 Hz, BSF=57.3 Hz, FTF=9.7 Hz at 1800 RPM.",
+      "text": "Diagnose signal 'vib_001' using bearing fault frequencies directly: BPFO=87.5 Hz, BPFI=132.5 Hz, BSF=57.3 Hz, FTF=9.7 Hz at 1800 RPM.",
       "category": "Diagnosis",
       "characteristic_form": "The expected response should use the provided fault frequencies directly (rather than computing them), perform envelope analysis, and check for peaks at those specific frequencies and their harmonics."
     },
     {
       "id": 317,
       "type": "Vibration",
-      "text": "Is unbalance detected in the vibration signal? The machine runs at 1500 RPM.",
+      "text": "Is unbalance detected in signal 'vib_001'? The machine runs at 1500 RPM.",
       "category": "Fault Classification",
       "characteristic_form": "The expected response should analyze the 1x shaft frequency (25 Hz) amplitude relative to 2x and 3x harmonics. Unbalance is indicated by a dominant 1x component."
     },
     {
       "id": 318,
       "type": "Vibration",
-      "text": "Check if there are signs of shaft misalignment in the vibration data. RPM is 3000.",
+      "text": "Check if there are signs of shaft misalignment in signal 'vib_001'. RPM is 3000.",
       "category": "Fault Classification",
       "characteristic_form": "The expected response should check if the 2x shaft frequency component (100 Hz) is elevated relative to 1x (50 Hz), which indicates shaft misalignment."
     },
     {
       "id": 319,
       "type": "Vibration",
-      "text": "Analyze the vibration signal for mechanical looseness at 1800 RPM.",
+      "text": "Analyze signal 'vib_001' for mechanical looseness at 1800 RPM.",
       "category": "Fault Classification",
       "characteristic_form": "The expected response should check for sub-harmonic (0.5x) and higher harmonics (3x+) of the shaft frequency, elevated crest factor, and presence of half-shaft-frequency component."
     },
     {
       "id": 320,
       "type": "Vibration",
-      "text": "Check for outer race bearing fault (BPFO) in the vibration signal. Shaft speed 1800 RPM, bearing model 6205.",
+      "text": "Check for outer race bearing fault (BPFO) in signal 'vib_001'. Shaft speed 1800 RPM, bearing model 6205.",
       "category": "Fault Classification",
       "characteristic_form": "The expected response should compute BPFO from 6205 geometry at 1800 RPM, perform envelope analysis, and check for peaks at BPFO and its harmonics (2x, 3x BPFO)."
+    },
+    {
+      "id": 321,
+      "type": "Vibration",
+      "text": "Chiller 6 at site MAIN is showing increased noise levels. Retrieve the vibration data for sensor Current from 2020-06-01 to 2020-06-07 and identify the most likely root cause.",
+      "category": "Diagnostic",
+      "characteristic_form": "The expected response should retrieve data via get_vibration_data, run diagnose_vibration or a combination of FFT and fault classification tools, and conclude with the most likely fault type (e.g., unbalance, misalignment, looseness, bearing defect) supported by spectral evidence."
+    },
+    {
+      "id": 322,
+      "type": "Vibration",
+      "text": "A maintenance technician reports that Chiller 6 vibrates more than usual. Fetch the Current sensor data from 2020-06-01 to 2020-06-03 at site MAIN, compute the FFT spectrum (top 5 peaks), assess severity, and explain what the dominant frequencies suggest.",
+      "category": "Diagnostic",
+      "characteristic_form": "The expected response should chain get_vibration_data, compute_fft_spectrum, and assess_vibration_severity, then reason about the peak frequencies in relation to potential fault mechanisms (shaft speed harmonics, bearing defects, structural resonance)."
+    },
+    {
+      "id": 323,
+      "type": "Vibration",
+      "text": "After diagnosing signal 'vib_001' at 1800 RPM with bearing 6205, the ISO severity is Zone C and outer race fault is suspected. Should we schedule immediate maintenance or can the machine continue operating? Justify the recommendation.",
+      "category": "Decision Support",
+      "characteristic_form": "The expected response should reference ISO 10816 Zone C meaning (barely tolerable), the bearing fault evidence, and provide a justified maintenance recommendation. The response should note that ISO 10816 thresholds are conservative and may produce false positives, but remain the accepted standard in commercial condition monitoring systems. The recommendation should balance this conservatism against the specific bearing fault evidence."
+    },
+    {
+      "id": 324,
+      "type": "Vibration",
+      "text": "Compare the vibration condition of two signals: 'vib_001' shows 2.1 mm/s RMS velocity (group2 machine) and 'vib_002' shows 7.8 mm/s RMS velocity (group2 machine). Which machine should be prioritized for maintenance and why?",
+      "category": "Decision Support",
+      "characteristic_form": "The expected response should call assess_vibration_severity for both values, compare the ISO zones (A/B vs C/D), and recommend maintenance prioritization with justification based on severity difference and risk."
     }
   ]
