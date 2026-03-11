@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import uuid
 
 import mlflow
@@ -73,6 +74,10 @@ class Answer(BaseModel):
     )
 
 
+class BuildDate(BaseModel):
+    build_date: str
+
+
 class TrackingContext(BaseModel):
     uri: str = TRACKING_URI
     experiment_id: str
@@ -84,6 +89,11 @@ class Submission(BaseModel):
         description="List of answers for one or more scenarios in this submission"
     )
     tracking_context: TrackingContext | None = None
+
+
+@get("/build-date")
+async def build_date() -> BuildDate:
+    return BuildDate(build_date=os.getenv("BUILD_DATE", "unknown"))
 
 
 @post("/scenario-set/{scenario_set_id: str}/deferred-grading")
@@ -307,6 +317,7 @@ OPENAPI_CONFIG = OpenAPIConfig(
 )
 
 ROUTE_HANDLERS: list[HTTPRouteHandler] = [
+    build_date,
     health,
     scenario_types,
     fetch_scenario,
