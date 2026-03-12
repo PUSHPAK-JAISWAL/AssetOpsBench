@@ -51,16 +51,16 @@
     {
       "id": 308,
       "type": "Vibration",
-      "text": "Fetch vibration sensor data from Chiller 6, sensor Current, from 2020-06-01 to 2020-06-07 at site MAIN.",
+      "text": "Fetch vibration sensor data from Motor_01, sensor Vibration_X, from 2024-01-15 to 2024-01-15T01:00:00 at site PLANT_A.",
       "category": "Data Retrieval",
-      "characteristic_form": "The expected response should load time-series data from CouchDB for asset 'Chiller 6', sensor 'Current', return a data_id, sample count, duration, and basic statistics (RMS, peak, mean)."
+      "characteristic_form": "The expected response should load time-series data from CouchDB for asset 'Motor_01', sensor 'Vibration_X', return a data_id, sample count, duration, and basic statistics (RMS, peak, mean). Note: CouchDB must be populated with vibration time-series data (acceleration in g, sampled at >= 1 kHz) for this scenario to execute."
     },
     {
       "id": 309,
       "type": "Vibration",
-      "text": "What sensors are available for Chiller 6 at site MAIN?",
+      "text": "What vibration sensors are available for Motor_01 at site PLANT_A?",
       "category": "Data Retrieval",
-      "characteristic_form": "The expected response should list available sensor fields for Chiller 6 from CouchDB."
+      "characteristic_form": "The expected response should call list_vibration_sensors for asset 'Motor_01' at site PLANT_A and return a list of available sensor field names (e.g., Vibration_X, Vibration_Y, Vibration_Z) as stored in CouchDB. Note: CouchDB must be populated with vibration sensor documents for this scenario to execute."
     },
     {
       "id": 310,
@@ -142,14 +142,14 @@
     {
       "id": 321,
       "type": "Vibration",
-      "text": "Chiller 6 at site MAIN is showing increased noise levels. Retrieve the vibration data for sensor Current from 2020-06-01 to 2020-06-07 and identify the most likely root cause.",
+      "text": "Motor_01 at site PLANT_A is showing increased noise levels. Retrieve the vibration data for sensor Vibration_X from 2024-01-15 to 2024-01-15T01:00:00 and identify the most likely root cause.",
       "category": "Diagnostic",
       "characteristic_form": "The expected response should retrieve data via get_vibration_data, run diagnose_vibration or a combination of FFT and fault classification tools, and conclude with the most likely fault type (e.g., unbalance, misalignment, looseness, bearing defect) supported by spectral evidence."
     },
     {
       "id": 322,
       "type": "Vibration",
-      "text": "A maintenance technician reports that Chiller 6 vibrates more than usual. Fetch the Current sensor data from 2020-06-01 to 2020-06-03 at site MAIN, compute the FFT spectrum (top 5 peaks), assess severity, and explain what the dominant frequencies suggest.",
+      "text": "A maintenance technician reports that Motor_01 vibrates more than usual. Fetch the Vibration_X sensor data from 2024-01-15 to 2024-01-15T00:30:00 at site PLANT_A, compute the FFT spectrum (top 5 peaks), assess severity, and explain what the dominant frequencies suggest.",
       "category": "Diagnostic",
       "characteristic_form": "The expected response should chain get_vibration_data, compute_fft_spectrum, and assess_vibration_severity, then reason about the peak frequencies in relation to potential fault mechanisms (shaft speed harmonics, bearing defects, structural resonance)."
     },
