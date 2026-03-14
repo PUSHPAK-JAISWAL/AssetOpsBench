@@ -24,7 +24,7 @@ def _kurtosis(x: NDArray) -> float:
     if n < 4:
         return 0.0
     m = np.mean(x)
-    s = np.std(x, ddof=1)
+    s = np.std(x, ddof=1)  # sample std, consistent with main.py & fault_detection.py
     if s < 1e-15:
         return 0.0
     return float(np.mean(((x - m) / s) ** 4) - 3.0)
