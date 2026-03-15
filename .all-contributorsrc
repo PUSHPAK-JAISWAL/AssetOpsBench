@@ -117,15 +117,6 @@
         "doc",
         "code"
       ]
-    },
-    {
-      "login": "LGDiMaggio",
-      "name": "LGDiMaggio",
-      "avatar_url": "https://github.com/LGDiMaggio.png",
-      "profile": "https://github.com/LGDiMaggio",
-      "contributions": [
-        "code"
-      ]
     }
   ],
   "commitType": "docs",
