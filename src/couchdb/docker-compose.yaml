@@ -1,6 +1,6 @@
 services:
   couchdb:
-    image: couchdb:3.3
+    image: couchdb:3.5
     environment:
       COUCHDB_PASSWORD: password
       COUCHDB_USERNAME: admin
