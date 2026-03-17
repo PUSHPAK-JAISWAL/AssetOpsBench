@@ -35,6 +35,7 @@ DEFAULT_SERVER_PATHS: dict[str, Path | str] = {
     "Utilities": "utilities-mcp-server",
     "FMSRAgent": "fmsr-mcp-server",
     "TSFMAgent": "tsfm-mcp-server",
+    "WorkOrderAgent": "wo-mcp-server",
 }
 
 _PLACEHOLDER_RE = re.compile(r"\{step_(\d+)\}")
