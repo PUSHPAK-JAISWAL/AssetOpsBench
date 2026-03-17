@@ -20,7 +20,7 @@ echo "CouchDB is ready."
 echo "Installing Python dependencies..."
 apt-get update -qq
 apt-get install -y -qq python3 python3-pip
-pip3 install -q requests pandas python-dotenv
+pip3 install -q --break-system-packages requests pandas python-dotenv
 
 echo "Loading IoT asset data..."
 COUCHDB_URL="http://localhost:5984" \
