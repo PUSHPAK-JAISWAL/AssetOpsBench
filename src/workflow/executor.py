@@ -69,7 +69,7 @@ class Executor:
         self._llm = llm
         self._server_paths = DEFAULT_SERVER_PATHS if server_paths is None else server_paths
 
-    async def get_agent_descriptions(self) -> dict[str, str]:
+    async def get_server_descriptions(self) -> dict[str, str]:
         """Query each registered MCP server and return formatted tool signatures."""
         descriptions: dict[str, str] = {}
         for name, path in self._server_paths.items():
@@ -96,7 +96,7 @@ class Executor:
         for step in ordered:
             _log.info(
                 "Step %d/%d [%s]: %s",
-                step.step_number, total, step.agent, step.task,
+                step.step_number, total, step.server, step.task,
             )
             result = await self.execute_step(step, context, question)
             if result.success:
@@ -121,16 +121,16 @@ class Executor:
            them from prior step results.
         4. Call the tool and return its result.
         """
-        server_path = self._server_paths.get(step.agent)
+        server_path = self._server_paths.get(step.server)
         if server_path is None:
             return StepResult(
                 step_number=step.step_number,
                 task=step.task,
-                agent=step.agent,
+                server=step.server,
                 response="",
                 error=(
-                    f"Unknown agent '{step.agent}'. "
-                    f"Registered agents: {list(self._server_paths)}"
+                    f"Unknown server '{step.server}'. "
+                    f"Registered servers: {list(self._server_paths)}"
                 ),
             )
 
@@ -138,7 +138,7 @@ class Executor:
             return StepResult(
                 step_number=step.step_number,
                 task=step.task,
-                agent=step.agent,
+                server=step.server,
                 response=step.expected_output,
                 tool=step.tool,
                 tool_args=step.tool_args,
@@ -160,7 +160,7 @@ class Executor:
             return StepResult(
                 step_number=step.step_number,
                 task=step.task,
-                agent=step.agent,
+                server=step.server,
                 response=response,
                 tool=step.tool,
                 tool_args=resolved_args,
@@ -169,7 +169,7 @@ class Executor:
             return StepResult(
                 step_number=step.step_number,
                 task=step.task,
-                agent=step.agent,
+                server=step.server,
                 response="",
                 error=str(exc),
                 tool=step.tool,

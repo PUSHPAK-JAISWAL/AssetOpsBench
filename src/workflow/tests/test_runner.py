@@ -22,14 +22,14 @@ from workflow.runner import PlanExecuteRunner
 
 _TWO_STEP_PLAN = """\
 #Task1: Get IoT sites
-#Agent1: IoTAgent
+#Server1: IoTAgent
 #Tool1: sites
 #Args1: {}
 #Dependency1: None
 #ExpectedOutput1: List of site names
 
 #Task2: Get current datetime
-#Agent2: Utilities
+#Server2: Utilities
 #Tool2: current_date_time
 #Args2: {}
 #Dependency2: None
@@ -58,7 +58,7 @@ def _patch_mcp(tool_response: str = _TOOL_RESPONSE):
 
 def _make_step(
     n: int,
-    agent: str = "IoTAgent",
+    server: str = "IoTAgent",
     tool: str = "sites",
     tool_args: dict | None = None,
     deps: list[int] | None = None,
@@ -66,7 +66,7 @@ def _make_step(
     return PlanStep(
         step_number=n,
         task=f"Task {n}",
-        agent=agent,
+        server=server,
         tool=tool,
         tool_args=tool_args or {},
         dependencies=deps or [],
@@ -102,10 +102,10 @@ async def test_orchestrator_all_steps_succeed(sequential_llm):
 
 
 @pytest.mark.anyio
-async def test_orchestrator_unknown_agent_recorded_as_error(sequential_llm):
+async def test_orchestrator_unknown_server_recorded_as_error(sequential_llm):
     bad_plan = (
         "#Task1: Do something\n"
-        "#Agent1: GhostAgent\n"
+        "#Server1: GhostAgent\n"
         "#Tool1: ghost_tool\n"
         "#Args1: {}\n"
         "#Dependency1: None\n"
@@ -125,7 +125,7 @@ async def test_orchestrator_no_tool_returns_expected_output(sequential_llm):
     """A step with tool=none returns expected_output directly (no MCP call)."""
     plan_with_no_tool = (
         "#Task1: Answer from context\n"
-        "#Agent1: IoTAgent\n"
+        "#Server1: IoTAgent\n"
         "#Tool1: none\n"
         "#Args1: {}\n"
         "#Dependency1: None\n"
@@ -143,7 +143,7 @@ async def test_orchestrator_no_tool_returns_expected_output(sequential_llm):
 
 
 @pytest.mark.anyio
-async def test_executor_unknown_agent(mock_llm):
+async def test_executor_unknown_server(mock_llm):
     llm = mock_llm("")
     executor = Executor(llm, server_paths={})  # no servers registered
 
@@ -156,7 +156,7 @@ async def test_executor_unknown_agent(mock_llm):
 
 
 @pytest.mark.anyio
-async def test_executor_get_agent_descriptions(mock_llm):
+async def test_executor_get_server_descriptions(mock_llm):
     llm = mock_llm()
     executor = Executor(llm, server_paths={"TestServer": None})
 
@@ -166,7 +166,7 @@ async def test_executor_get_agent_descriptions(mock_llm):
             return_value=[{"name": "foo", "description": "does foo", "parameters": []}]
         ),
     ):
-        descs = await executor.get_agent_descriptions()
+        descs = await executor.get_server_descriptions()
 
     assert "TestServer" in descs
     assert "foo" in descs["TestServer"]
@@ -223,13 +223,13 @@ async def test_pipeline_resolves_placeholder_from_planner_output(sequential_llm)
     """
     planner_output = (
         "#Task1: Get IoT sites\n"
-        "#Agent1: IoTAgent\n"
+        "#Server1: IoTAgent\n"
         "#Tool1: sites\n"
         "#Args1: {}\n"
         "#Dependency1: None\n"
         "#ExpectedOutput1: List of site names\n\n"
         "#Task2: Get assets at the site from step 1\n"
-        "#Agent2: IoTAgent\n"
+        "#Server2: IoTAgent\n"
         "#Tool2: assets\n"
         '#Args2: {"site_name": "{step_1}"}\n'
         "#Dependency2: #S1\n"
@@ -303,7 +303,7 @@ def test_has_placeholders_non_string_ignored():
 @pytest.mark.anyio
 async def test_resolve_args_with_llm_resolves_placeholder(mock_llm):
     llm = mock_llm('{"asset_id": "CH-1"}')
-    ctx = {1: StepResult(step_number=1, task="t", agent="a",
+    ctx = {1: StepResult(step_number=1, task="t", server="a",
                          response='{"assets": ["CH-1", "CH-2"]}')}
     result = await _resolve_args_with_llm(
         "get sensors", "sensors",
@@ -317,7 +317,7 @@ async def test_resolve_args_with_llm_resolves_placeholder(mock_llm):
 @pytest.mark.anyio
 async def test_resolve_args_with_llm_fallback_on_bad_json(mock_llm):
     llm = mock_llm("I cannot determine the value.")
-    ctx = {1: StepResult(step_number=1, task="t", agent="a", response="data")}
+    ctx = {1: StepResult(step_number=1, task="t", server="a", response="data")}
     result = await _resolve_args_with_llm(
         "task", "tool", {"x": "{step_1}"}, ctx, llm
     )
@@ -334,7 +334,7 @@ def test_resolve_args_no_placeholders():
 
 
 def test_resolve_args_replaces_placeholder():
-    ctx = {1: StepResult(step_number=1, task="t", agent="a", response="MAIN")}
+    ctx = {1: StepResult(step_number=1, task="t", server="a", response="MAIN")}
     resolved = _resolve_args({"site_name": "{step_1}"}, ctx)
     assert resolved["site_name"] == "MAIN"
 
