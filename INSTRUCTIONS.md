@@ -8,11 +8,11 @@ This directory contains the MCP servers and infrastructure for the AssetOpsBench
 - [Quick Start](#quick-start)
 - [Environment Variables](#environment-variables)
 - [MCP Servers](#mcp-servers)
-  - [IoTAgent](#iotagent)
-  - [Utilities](#utilities)
-  - [FMSRAgent](#fmsragent)
-  - [TSFMAgent](#tsfmagent)
-  - [WorkOrderAgent](#workorderagent)
+  - [iot](#iot)
+  - [utilities](#utilities)
+  - [fmsr](#fmsr)
+  - [tsfm](#tsfm)
+  - [wo](#wo)
 - [Plan-Execute Runner](#plan-execute-runner)
   - [How it works](#how-it-works)
   - [CLI](#cli)
@@ -114,7 +114,7 @@ uv run wo-mcp-server
 
 ## MCP Servers
 
-### IoTAgent
+### iot
 
 **Path:** `src/servers/iot/main.py`
 **Requires:** CouchDB (`COUCHDB_URL`, `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`, `IOT_DBNAME`)
@@ -126,7 +126,7 @@ uv run wo-mcp-server
 | `sensors` | `site_name`, `asset_id` | List sensor names for an asset |
 | `history` | `site_name`, `asset_id`, `start`, `final?` | Fetch historical sensor readings for a time range (ISO 8601 timestamps) |
 
-### Utilities
+### utilities
 
 **Path:** `src/servers/utilities/main.py`
 **Requires:** nothing (no external services)
@@ -137,7 +137,7 @@ uv run wo-mcp-server
 | `current_date_time` | — | Return the current UTC date and time as JSON |
 | `current_time_english` | — | Return the current UTC time as a human-readable string |
 
-### FMSRAgent
+### fmsr
 
 **Path:** `src/servers/fmsr/main.py`
 **Requires:** `WATSONX_APIKEY`, `WATSONX_PROJECT_ID`, `WATSONX_URL` for unknown assets; curated lists for `chiller` and `ahu` work without credentials.
@@ -148,7 +148,7 @@ uv run wo-mcp-server
 | `get_failure_modes` | `asset_name` | Return known failure modes for an asset. Uses a curated YAML list for chillers and AHUs; falls back to the LLM for other types. |
 | `get_failure_mode_sensor_mapping` | `asset_name`, `failure_modes`, `sensors` | For each (failure mode, sensor) pair, determine relevancy via LLM. Returns bidirectional `fm→sensors` and `sensor→fms` maps plus full per-pair details. |
 
-### WorkOrderAgent
+### wo
 
 **Path:** `src/servers/wo/main.py`
 **Requires:** CouchDB (`COUCHDB_URL`, `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`, `WO_DBNAME`)
@@ -165,7 +165,7 @@ uv run wo-mcp-server
 | `predict_next_work_order` | `equipment_id`, `start_date?`, `end_date?` | Predict next work order type via Markov transition matrix built from historical sequence |
 | `analyze_alert_to_failure` | `equipment_id`, `rule_id`, `start_date?`, `end_date?` | Probability that an alert rule leads to a work order; average hours to maintenance |
 
-### TSFMAgent
+### tsfm
 
 **Path:** `src/servers/tsfm/main.py`
 **Requires:** `tsfm_public` (IBM Granite TSFM), `transformers`, `torch` for ML tools — imported lazily; static tools work without them.
@@ -249,7 +249,7 @@ uv run plan-execute --show-history --json "How many observations exist for CH-1?
 
 ### End-to-end examples
 
-All five servers (IoTAgent, Utilities, FMSRAgent, TSFMAgent, WorkOrderAgent) are registered by default.
+All five servers (iot, utilities, fmsr, tsfm, wo) are registered by default.
 
 #### Work order queries (requires CouchDB + populated `workorder` db)
 
@@ -282,21 +282,21 @@ uv run plan-execute --show-plan --show-history \
 Expected plan (3 parallel steps, no dependencies):
 
 ```
-[1] Utilities  : current_date_time()
-[2] IoTAgent   : assets(site_name="MAIN")
-[3] FMSRAgent  : get_failure_modes(asset_name="chiller")
+[1] utilities  : current_date_time()
+[2] iot        : assets(site_name="MAIN")
+[3] fmsr       : get_failure_modes(asset_name="chiller")
 ```
 
 Expected execution output (trimmed):
 
 ```
-[OK] Step 1 (Utilities)
+[OK] Step 1 (utilities)
      {"currentDateTime": "2026-02-20T17:28:39Z", "currentDateTimeDescription": "Today's date is 2026-02-20 and time is 17:28:39."}
 
-[OK] Step 2 (IoTAgent)
+[OK] Step 2 (iot)
      {"site_name": "MAIN", "total_assets": 1, "assets": ["Chiller 6"], "message": "found 1 assets for site_name MAIN."}
 
-[OK] Step 3 (FMSRAgent)
+[OK] Step 3 (fmsr)
      {"asset_name": "chiller", "failure_modes": ["Compressor Overheating: Failed due to Normal wear, overheating", ...]}
 ```
 
@@ -338,7 +338,7 @@ runner = PlanExecuteRunner(llm=MyLLM())
 
 ### Add more MCP servers
 
-Pass `server_paths` to register additional servers. Keys must match the agent names the planner assigns steps to:
+Pass `server_paths` to register additional servers. Keys must match the server names the planner assigns steps to:
 
 ```python
 from workflow import PlanExecuteRunner
@@ -346,10 +346,10 @@ from workflow import PlanExecuteRunner
 runner = PlanExecuteRunner(
     llm=my_llm,
     server_paths={
-        "IoTAgent":  "iot-mcp-server",
-        "Utilities": "utilities-mcp-server",
-        "FMSRAgent": "fmsr-mcp-server",
-        "TSFMAgent": "tsfm-mcp-server",
+        "iot":       "iot-mcp-server",
+        "utilities": "utilities-mcp-server",
+        "fmsr":      "fmsr-mcp-server",
+        "tsfm":      "tsfm-mcp-server",
     },
 )
 ```
@@ -369,19 +369,19 @@ Add the following to your Claude Desktop `claude_desktop_config.json`:
       "command": "/path/to/uv",
       "args": ["run", "--project", "/path/to/AssetOpsBench", "utilities-mcp-server"]
     },
-    "IoTAgent": {
+    "iot": {
       "command": "/path/to/uv",
       "args": ["run", "--project", "/path/to/AssetOpsBench", "iot-mcp-server"]
     },
-    "FMSRAgent": {
+    "fmsr": {
       "command": "/path/to/uv",
       "args": ["run", "--project", "/path/to/AssetOpsBench", "fmsr-mcp-server"]
     },
-    "TSFMAgent": {
+    "tsfm": {
       "command": "/path/to/uv",
       "args": ["run", "--project", "/path/to/AssetOpsBench", "tsfm-mcp-server"]
     },
-    "WorkOrderAgent": {
+    "wo": {
       "command": "/path/to/uv",
       "args": ["run", "--project", "/path/to/AssetOpsBench", "wo-mcp-server"]
     }
@@ -455,8 +455,8 @@ uv run pytest src/ -v
 │                   │ stdio      │                     │
 └───────────────────┼────────────┼─────────────────────┘
                     │ MCP protocol (stdio)
-         ┌──────────┼──────────┬──────────┬──────────────┐
-         ▼          ▼          ▼          ▼              ▼
-      IoTAgent   Utilities   FMSRAgent  TSFMAgent  WorkOrderAgent
-      (tools)    (tools)     (tools)    (tools)       (tools)
+         ┌──────────┼──────────┬──────────┬──────┐
+         ▼          ▼          ▼          ▼      ▼
+        iot     utilities    fmsr       tsfm    wo
+      (tools)    (tools)    (tools)   (tools) (tools)
 ```

@@ -31,7 +31,7 @@ except Exception as e:
     logger.error(f"Failed to connect to CouchDB: {e}")
     db = None
 
-mcp = FastMCP("IoTAgent")
+mcp = FastMCP("iot")
 
 # Static site as per original requirement
 SITES = ["MAIN"]
