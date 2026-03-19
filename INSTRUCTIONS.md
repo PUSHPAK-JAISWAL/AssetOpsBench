@@ -94,21 +94,50 @@ uv run wo-mcp-server
 
 ## Environment Variables
 
-| Variable | Required | Description |
+**CouchDB** — `iot` and `wo` servers
+
+| Variable | Default | Description |
 |---|---|---|
-| `COUCHDB_URL` | IoT + WO servers | CouchDB connection URL, e.g. `http://localhost:5984` |
-| `COUCHDB_USERNAME` | IoT + WO servers | CouchDB admin username |
-| `COUCHDB_PASSWORD` | IoT + WO servers | CouchDB admin password |
-| `IOT_DBNAME` | IoT server | IoT sensor database name (default: `chiller`) |
-| `WO_DBNAME` | WO server | Work order database name (default: `workorder`) |
-| `WATSONX_APIKEY` | `--platform watsonx` | IBM WatsonX API key |
-| `WATSONX_PROJECT_ID` | `--platform watsonx` | IBM WatsonX project ID |
-| `WATSONX_URL` | `--platform watsonx` | WatsonX endpoint (optional; defaults to `https://us-south.ml.cloud.ibm.com`) |
-| `LITELLM_API_KEY` | `--platform litellm` | LiteLLM API key |
-| `LITELLM_BASE_URL` | `--platform litellm` | LiteLLM base URL (e.g. `https://your-litellm-host.example.com`) |
-| `PATH_TO_MODELS_DIR` | TSFM server | Base directory for TTM model checkpoints (default: `src/servers/tsfm/artifacts/output/tuned_models`) |
-| `PATH_TO_DATASETS_DIR` | TSFM server | Base directory for resolving relative dataset paths |
-| `PATH_TO_OUTPUTS_DIR` | TSFM server | Base directory for resolving output/save paths |
+| `COUCHDB_URL` | _(required)_ | CouchDB connection URL, e.g. `http://localhost:5984` |
+| `COUCHDB_USERNAME` | _(required)_ | CouchDB admin username |
+| `COUCHDB_PASSWORD` | _(required)_ | CouchDB admin password |
+| `IOT_DBNAME` | _(required)_ | IoT sensor database name (e.g. `chiller`) |
+| `WO_DBNAME` | `workorder` | Work order database name |
+
+**WatsonX** — `fmsr` server (when `FMSR_MODEL_ID` starts with `watsonx/`) and `plan-execute` (when `--model-id` starts with `watsonx/`)
+
+| Variable | Default | Description |
+|---|---|---|
+| `WATSONX_APIKEY` | _(required)_ | IBM WatsonX API key |
+| `WATSONX_PROJECT_ID` | _(required)_ | IBM WatsonX project ID |
+| `WATSONX_URL` | `https://us-south.ml.cloud.ibm.com` | WatsonX endpoint (optional) |
+
+**LiteLLM** — `fmsr` server (when `FMSR_MODEL_ID` does not start with `watsonx/`) and `plan-execute` (when `--model-id` does not start with `watsonx/`, e.g. `litellm_proxy/…`)
+
+| Variable | Default | Description |
+|---|---|---|
+| `LITELLM_API_KEY` | _(required)_ | LiteLLM proxy API key |
+| `LITELLM_BASE_URL` | _(required)_ | LiteLLM proxy base URL, e.g. `https://your-litellm-host.example.com` |
+
+**FMSR server**
+
+| Variable | Default | Description |
+|---|---|---|
+| `FMSR_MODEL_ID` | `watsonx/meta-llama/llama-3-3-70b-instruct` | LiteLLM model string used by the `fmsr` server for LLM-based failure mode queries |
+
+**TSFM server**
+
+| Variable | Default | Description |
+|---|---|---|
+| `PATH_TO_MODELS_DIR` | `src/servers/tsfm/artifacts/output/tuned_models` | Base directory for TTM model checkpoints |
+| `PATH_TO_DATASETS_DIR` | _(cwd)_ | Base directory for resolving relative dataset paths |
+| `PATH_TO_OUTPUTS_DIR` | _(cwd)_ | Base directory for resolving output/save paths |
+
+**General** — all servers
+
+| Variable | Default | Description |
+|---|---|---|
+| `LOG_LEVEL` | `WARNING` | Log level for MCP servers (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 
 ---
 
