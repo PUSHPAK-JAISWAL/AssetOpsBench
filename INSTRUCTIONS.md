@@ -96,29 +96,28 @@ uv run wo-mcp-server
 
 **CouchDB** — `iot` and `wo` servers
 
-| Variable | Default | Description |
-|---|---|---|
-| `COUCHDB_URL` | _(required)_ | CouchDB connection URL, e.g. `http://localhost:5984` |
-| `COUCHDB_USERNAME` | _(required)_ | CouchDB admin username |
-| `COUCHDB_PASSWORD` | _(required)_ | CouchDB admin password |
-| `IOT_DBNAME` | _(required)_ | IoT sensor database name (e.g. `chiller`) |
-| `WO_DBNAME` | `workorder` | Work order database name |
+| Variable           | Default                 | Description              |
+| ------------------ | ----------------------- | ------------------------ |
+| `COUCHDB_URL`      | `http://localhost:5984` | CouchDB connection URL   |
+| `COUCHDB_USERNAME` | `admin`                 | CouchDB admin username   |
+| `COUCHDB_PASSWORD` | `password`              | CouchDB admin password   |
+| `IOT_DBNAME`       | `chiller`               | IoT sensor database name |
+| `WO_DBNAME`        | `workorder`             | Work order database name |
 
-**WatsonX** — `fmsr` server (when `FMSR_MODEL_ID` starts with `watsonx/`) and `plan-execute` (when `--model-id` starts with `watsonx/`)
+**WatsonX** — plan-execute runner (when `--model-id` starts with `watsonx/`)
 
-| Variable | Default | Description |
-|---|---|---|
-| `WATSONX_APIKEY` | _(required)_ | IBM WatsonX API key |
-| `WATSONX_PROJECT_ID` | _(required)_ | IBM WatsonX project ID |
-| `WATSONX_URL` | `https://us-south.ml.cloud.ibm.com` | WatsonX endpoint (optional) |
+| Variable             | Default                             | Description                 |
+| -------------------- | ----------------------------------- | --------------------------- |
+| `WATSONX_APIKEY`     | _(required)_                        | IBM WatsonX API key         |
+| `WATSONX_PROJECT_ID` | _(required)_                        | IBM WatsonX project ID      |
+| `WATSONX_URL`        | `https://us-south.ml.cloud.ibm.com` | WatsonX endpoint (optional) |
 
-**LiteLLM** — `fmsr` server (when `FMSR_MODEL_ID` does not start with `watsonx/`) and `plan-execute` (when `--model-id` does not start with `watsonx/`, e.g. `litellm_proxy/…`)
+**LiteLLM** — plan-execute runner (when `--model-id` does not start with `watsonx/`, e.g. `litellm_proxy/…`)
 
-| Variable | Default | Description |
-|---|---|---|
-| `LITELLM_API_KEY` | _(required)_ | LiteLLM proxy API key |
+| Variable           | Default      | Description                                                          |
+| ------------------ | ------------ | -------------------------------------------------------------------- |
+| `LITELLM_API_KEY`  | _(required)_ | LiteLLM proxy API key                                                |
 | `LITELLM_BASE_URL` | _(required)_ | LiteLLM proxy base URL, e.g. `https://your-litellm-host.example.com` |
-
 
 ---
 
@@ -129,11 +128,11 @@ uv run wo-mcp-server
 **Path:** `src/servers/iot/main.py`
 **Requires:** CouchDB (`COUCHDB_URL`, `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`, `IOT_DBNAME`)
 
-| Tool | Arguments | Description |
-|---|---|---|
-| `sites` | — | List all available sites |
-| `assets` | `site_name` | List all asset IDs for a site |
-| `sensors` | `site_name`, `asset_id` | List sensor names for an asset |
+| Tool      | Arguments                                  | Description                                                             |
+| --------- | ------------------------------------------ | ----------------------------------------------------------------------- |
+| `sites`   | —                                          | List all available sites                                                |
+| `assets`  | `site_name`                                | List all asset IDs for a site                                           |
+| `sensors` | `site_name`, `asset_id`                    | List sensor names for an asset                                          |
 | `history` | `site_name`, `asset_id`, `start`, `final?` | Fetch historical sensor readings for a time range (ISO 8601 timestamps) |
 
 ### utilities
@@ -141,11 +140,11 @@ uv run wo-mcp-server
 **Path:** `src/servers/utilities/main.py`
 **Requires:** nothing (no external services)
 
-| Tool | Arguments | Description |
-|---|---|---|
-| `json_reader` | `file_name` | Read and parse a JSON file from disk |
-| `current_date_time` | — | Return the current UTC date and time as JSON |
-| `current_time_english` | — | Return the current UTC time as a human-readable string |
+| Tool                   | Arguments   | Description                                            |
+| ---------------------- | ----------- | ------------------------------------------------------ |
+| `json_reader`          | `file_name` | Read and parse a JSON file from disk                   |
+| `current_date_time`    | —           | Return the current UTC date and time as JSON           |
+| `current_time_english` | —           | Return the current UTC time as a human-readable string |
 
 ### fmsr
 
@@ -153,9 +152,9 @@ uv run wo-mcp-server
 **Requires:** `WATSONX_APIKEY`, `WATSONX_PROJECT_ID`, `WATSONX_URL` for unknown assets; curated lists for `chiller` and `ahu` work without credentials.
 **Failure-mode data:** `src/servers/fmsr/failure_modes.yaml` (edit to add/change asset entries)
 
-| Tool | Arguments | Description |
-|---|---|---|
-| `get_failure_modes` | `asset_name` | Return known failure modes for an asset. Uses a curated YAML list for chillers and AHUs; falls back to the LLM for other types. |
+| Tool                              | Arguments                                | Description                                                                                                                                             |
+| --------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_failure_modes`               | `asset_name`                             | Return known failure modes for an asset. Uses a curated YAML list for chillers and AHUs; falls back to the LLM for other types.                         |
 | `get_failure_mode_sensor_mapping` | `asset_name`, `failure_modes`, `sensors` | For each (failure mode, sensor) pair, determine relevancy via LLM. Returns bidirectional `fm→sensors` and `sensor→fms` maps plus full per-pair details. |
 
 ### wo
@@ -164,16 +163,16 @@ uv run wo-mcp-server
 **Requires:** CouchDB (`COUCHDB_URL`, `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`, `WO_DBNAME`)
 **Data init:** Handled automatically by `docker compose -f src/couchdb/docker-compose.yaml up` (runs `src/couchdb/init_wo.py` inside the CouchDB container on first start)
 
-| Tool | Arguments | Description |
-|---|---|---|
-| `get_work_orders` | `equipment_id`, `start_date?`, `end_date?` | Retrieve all work orders for an equipment within an optional date range |
-| `get_preventive_work_orders` | `equipment_id`, `start_date?`, `end_date?` | Retrieve only preventive (PM) work orders |
-| `get_corrective_work_orders` | `equipment_id`, `start_date?`, `end_date?` | Retrieve only corrective (CM) work orders |
-| `get_events` | `equipment_id`, `start_date?`, `end_date?` | Retrieve all events (work orders, alerts, anomalies) |
-| `get_failure_codes` | — | List all failure codes with categories and descriptions |
-| `get_work_order_distribution` | `equipment_id`, `start_date?`, `end_date?` | Count work orders per (primary, secondary) failure code pair, sorted by frequency |
-| `predict_next_work_order` | `equipment_id`, `start_date?`, `end_date?` | Predict next work order type via Markov transition matrix built from historical sequence |
-| `analyze_alert_to_failure` | `equipment_id`, `rule_id`, `start_date?`, `end_date?` | Probability that an alert rule leads to a work order; average hours to maintenance |
+| Tool                          | Arguments                                             | Description                                                                              |
+| ----------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `get_work_orders`             | `equipment_id`, `start_date?`, `end_date?`            | Retrieve all work orders for an equipment within an optional date range                  |
+| `get_preventive_work_orders`  | `equipment_id`, `start_date?`, `end_date?`            | Retrieve only preventive (PM) work orders                                                |
+| `get_corrective_work_orders`  | `equipment_id`, `start_date?`, `end_date?`            | Retrieve only corrective (CM) work orders                                                |
+| `get_events`                  | `equipment_id`, `start_date?`, `end_date?`            | Retrieve all events (work orders, alerts, anomalies)                                     |
+| `get_failure_codes`           | —                                                     | List all failure codes with categories and descriptions                                  |
+| `get_work_order_distribution` | `equipment_id`, `start_date?`, `end_date?`            | Count work orders per (primary, secondary) failure code pair, sorted by frequency        |
+| `predict_next_work_order`     | `equipment_id`, `start_date?`, `end_date?`            | Predict next work order type via Markov transition matrix built from historical sequence |
+| `analyze_alert_to_failure`    | `equipment_id`, `rule_id`, `start_date?`, `end_date?` | Probability that an alert rule leads to a work order; average hours to maintenance       |
 
 ### tsfm
 
@@ -181,14 +180,14 @@ uv run wo-mcp-server
 **Requires:** `tsfm_public` (IBM Granite TSFM), `transformers`, `torch` for ML tools — imported lazily; static tools work without them.
 **Model checkpoints:** resolved relative to `PATH_TO_MODELS_DIR` (default: `src/servers/tsfm/artifacts/output/tuned_models`)
 
-| Tool | Arguments | Description |
-|---|---|---|
-| `get_ai_tasks` | — | List supported AI task types for time-series analysis |
-| `get_tsfm_models` | — | List available pre-trained TinyTimeMixer (TTM) model checkpoints |
-| `run_tsfm_forecasting` | `dataset_path`, `timestamp_column`, `target_columns`, `model_checkpoint?`, `forecast_horizon?`, `frequency_sampling?`, ... | Zero-shot TTM inference; returns path to a JSON predictions file |
-| `run_tsfm_finetuning` | `dataset_path`, `timestamp_column`, `target_columns`, `model_checkpoint?`, `save_model_dir?`, `n_finetune?`, `n_test?`, ... | Few-shot fine-tune a TTM model; returns saved checkpoint path and metrics file |
-| `run_tsad` | `dataset_path`, `tsfm_output_json`, `timestamp_column`, `target_columns`, `task?`, `false_alarm?`, `ad_model_type?`, ... | Conformal anomaly detection on top of a forecasting output JSON; returns CSV with anomaly labels |
-| `run_integrated_tsad` | `dataset_path`, `timestamp_column`, `target_columns`, `model_checkpoint?`, `false_alarm?`, `n_calibration?`, ... | End-to-end forecasting + anomaly detection in one call; returns combined CSV |
+| Tool                   | Arguments                                                                                                                   | Description                                                                                      |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `get_ai_tasks`         | —                                                                                                                           | List supported AI task types for time-series analysis                                            |
+| `get_tsfm_models`      | —                                                                                                                           | List available pre-trained TinyTimeMixer (TTM) model checkpoints                                 |
+| `run_tsfm_forecasting` | `dataset_path`, `timestamp_column`, `target_columns`, `model_checkpoint?`, `forecast_horizon?`, `frequency_sampling?`, ...  | Zero-shot TTM inference; returns path to a JSON predictions file                                 |
+| `run_tsfm_finetuning`  | `dataset_path`, `timestamp_column`, `target_columns`, `model_checkpoint?`, `save_model_dir?`, `n_finetune?`, `n_test?`, ... | Few-shot fine-tune a TTM model; returns saved checkpoint path and metrics file                   |
+| `run_tsad`             | `dataset_path`, `tsfm_output_json`, `timestamp_column`, `target_columns`, `task?`, `false_alarm?`, `ad_model_type?`, ...    | Conformal anomaly detection on top of a forecasting output JSON; returns CSV with anomaly labels |
+| `run_integrated_tsad`  | `dataset_path`, `timestamp_column`, `target_columns`, `model_checkpoint?`, `false_alarm?`, `n_calibration?`, ...            | End-to-end forecasting + anomaly detection in one call; returns combined CSV                     |
 
 ---
 
@@ -226,20 +225,20 @@ uv run plan-execute "What assets are available at site MAIN?"
 
 Flags:
 
-| Flag | Description |
-|---|---|
+| Flag                  | Description                                                                                                      |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `--model-id MODEL_ID` | litellm model string with provider prefix (default: `watsonx/meta-llama/llama-4-maverick-17b-128e-instruct-fp8`) |
-| `--server NAME=SPEC` | Override MCP servers with `NAME=SPEC` pairs (repeatable); SPEC is an entry-point name or path |
-| `--show-plan` | Print the generated plan before execution |
-| `--show-history` | Print each step result after execution |
-| `--json` | Output answer + plan + history as JSON |
+| `--server NAME=SPEC`  | Override MCP servers with `NAME=SPEC` pairs (repeatable); SPEC is an entry-point name or path                    |
+| `--show-plan`         | Print the generated plan before execution                                                                        |
+| `--show-history`      | Print each step result after execution                                                                           |
+| `--json`              | Output answer + plan + history as JSON                                                                           |
 
 The provider is encoded in the `--model-id` prefix:
 
-| Prefix | Provider | Required env vars |
-|---|---|---|
-| `watsonx/` | IBM WatsonX | `WATSONX_APIKEY`, `WATSONX_PROJECT_ID`, `WATSONX_URL` (optional) |
-| `litellm_proxy/` | LiteLLM proxy | `LITELLM_API_KEY`, `LITELLM_BASE_URL` |
+| Prefix           | Provider      | Required env vars                                                |
+| ---------------- | ------------- | ---------------------------------------------------------------- |
+| `watsonx/`       | IBM WatsonX   | `WATSONX_APIKEY`, `WATSONX_PROJECT_ID`, `WATSONX_URL` (optional) |
+| `litellm_proxy/` | LiteLLM proxy | `LITELLM_API_KEY`, `LITELLM_BASE_URL`                            |
 
 Examples:
 
@@ -326,11 +325,11 @@ print(result.answer)
 
 `OrchestratorResult` fields:
 
-| Field | Type | Description |
-|---|---|---|
-| `answer` | `str` | Final synthesised answer |
-| `plan` | `Plan` | The generated plan with its steps |
-| `history` | `list[StepResult]` | Per-step execution results |
+| Field     | Type               | Description                       |
+| --------- | ------------------ | --------------------------------- |
+| `answer`  | `str`              | Final synthesised answer          |
+| `plan`    | `Plan`             | The generated plan with its steps |
+| `history` | `list[StepResult]` | Per-step execution results        |
 
 ### Bring your own LLM
 
@@ -377,7 +376,12 @@ Add the following to your Claude Desktop `claude_desktop_config.json`:
   "mcpServers": {
     "utilities": {
       "command": "/path/to/uv",
-      "args": ["run", "--project", "/path/to/AssetOpsBench", "utilities-mcp-server"]
+      "args": [
+        "run",
+        "--project",
+        "/path/to/AssetOpsBench",
+        "utilities-mcp-server"
+      ]
     },
     "iot": {
       "command": "/path/to/uv",
@@ -410,6 +414,7 @@ uv run pytest src/ -v
 ```
 
 Integration tests are auto-skipped when the required service is not available:
+
 - IoT integration tests require `COUCHDB_URL` (set in `.env`)
 - Work order integration tests require `COUCHDB_URL` (set in `.env`)
 - FMSR integration tests require `WATSONX_APIKEY` (set in `.env`)
