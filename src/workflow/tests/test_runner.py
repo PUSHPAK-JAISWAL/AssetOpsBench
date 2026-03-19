@@ -22,14 +22,14 @@ from workflow.runner import PlanExecuteRunner
 
 _TWO_STEP_PLAN = """\
 #Task1: Get IoT sites
-#Server1: IoTAgent
+#Server1: iot
 #Tool1: sites
 #Args1: {}
 #Dependency1: None
 #ExpectedOutput1: List of site names
 
 #Task2: Get current datetime
-#Server2: Utilities
+#Server2: utilities
 #Tool2: current_date_time
 #Args2: {}
 #Dependency2: None
@@ -58,7 +58,7 @@ def _patch_mcp(tool_response: str = _TOOL_RESPONSE):
 
 def _make_step(
     n: int,
-    server: str = "IoTAgent",
+    server: str = "iot",
     tool: str = "sites",
     tool_args: dict | None = None,
     deps: list[int] | None = None,
@@ -105,7 +105,7 @@ async def test_orchestrator_all_steps_succeed(sequential_llm):
 async def test_orchestrator_unknown_server_recorded_as_error(sequential_llm):
     bad_plan = (
         "#Task1: Do something\n"
-        "#Server1: GhostAgent\n"
+        "#Server1: ghost\n"
         "#Tool1: ghost_tool\n"
         "#Args1: {}\n"
         "#Dependency1: None\n"
@@ -117,7 +117,7 @@ async def test_orchestrator_unknown_server_recorded_as_error(sequential_llm):
 
     assert len(result.history) == 1
     assert result.history[0].success is False
-    assert "GhostAgent" in result.history[0].error
+    assert "ghost" in result.history[0].error
 
 
 @pytest.mark.anyio
@@ -125,7 +125,7 @@ async def test_orchestrator_no_tool_returns_expected_output(sequential_llm):
     """A step with tool=none returns expected_output directly (no MCP call)."""
     plan_with_no_tool = (
         "#Task1: Answer from context\n"
-        "#Server1: IoTAgent\n"
+        "#Server1: iot\n"
         "#Tool1: none\n"
         "#Args1: {}\n"
         "#Dependency1: None\n"
@@ -152,7 +152,7 @@ async def test_executor_unknown_server(mock_llm):
         results = await executor.execute_plan(plan, "Q")
 
     assert results[0].success is False
-    assert "IoTAgent" in results[0].error
+    assert "iot" in results[0].error
 
 
 @pytest.mark.anyio
@@ -179,7 +179,7 @@ async def test_executor_resolves_placeholder_via_llm(mock_llm):
 
     resolved_json = json.dumps({"asset_id": "CH-1"})
     llm = mock_llm(resolved_json)
-    executor = Executor(llm, server_paths={"IoTAgent": Path("/fake/server.py")})
+    executor = Executor(llm, server_paths={"iot": Path("/fake/server.py")})
 
     plan = Plan(
         steps=[
@@ -223,13 +223,13 @@ async def test_pipeline_resolves_placeholder_from_planner_output(sequential_llm)
     """
     planner_output = (
         "#Task1: Get IoT sites\n"
-        "#Server1: IoTAgent\n"
+        "#Server1: iot\n"
         "#Tool1: sites\n"
         "#Args1: {}\n"
         "#Dependency1: None\n"
         "#ExpectedOutput1: List of site names\n\n"
         "#Task2: Get assets at the site from step 1\n"
-        "#Server2: IoTAgent\n"
+        "#Server2: iot\n"
         "#Tool2: assets\n"
         '#Args2: {"site_name": "{step_1}"}\n'
         "#Dependency2: #S1\n"
@@ -264,7 +264,7 @@ async def test_executor_no_placeholder_skips_llm(mock_llm):
     from pathlib import Path
 
     llm = mock_llm("")
-    executor = Executor(llm, server_paths={"IoTAgent": Path("/fake/server.py")})
+    executor = Executor(llm, server_paths={"iot": Path("/fake/server.py")})
 
     plan = Plan(steps=[_make_step(1, tool="sites", tool_args={})], raw="")
     call_mock = AsyncMock(return_value=_TOOL_RESPONSE)

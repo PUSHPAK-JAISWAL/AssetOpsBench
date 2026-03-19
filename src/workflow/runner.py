@@ -51,7 +51,7 @@ class PlanExecuteRunner:
 
     Args:
         llm: LLM backend used for planning, tool selection, and summarisation.
-        server_paths: Override MCP server specs.  Keys must match the agent
+        server_paths: Override MCP server specs.  Keys must match the server
                       names the planner will assign steps to.  Values are
                       either a uv entry-point name (str) or a Path to a
                       script file.  Defaults to all five registered servers.

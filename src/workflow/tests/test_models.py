@@ -7,7 +7,7 @@ def _step(n: int, deps: list[int] | None = None) -> PlanStep:
     return PlanStep(
         step_number=n,
         task=f"Task {n}",
-        server="IoTAgent",
+        server="iot",
         tool="sites",
         tool_args={},
         dependencies=deps or [],

@@ -31,11 +31,11 @@ _REPO_ROOT = _MCP_ROOT.parent
 # Entry-point names are invoked as ``uv run <name>``; Paths fall back to
 # ``python -m module.path`` (supports relative imports).
 DEFAULT_SERVER_PATHS: dict[str, Path | str] = {
-    "IoTAgent": "iot-mcp-server",
-    "Utilities": "utilities-mcp-server",
-    "FMSRAgent": "fmsr-mcp-server",
-    "TSFMAgent": "tsfm-mcp-server",
-    "WorkOrderAgent": "wo-mcp-server",
+    "iot": "iot-mcp-server",
+    "utilities": "utilities-mcp-server",
+    "fmsr": "fmsr-mcp-server",
+    "tsfm": "tsfm-mcp-server",
+    "wo": "wo-mcp-server",
 }
 
 _PLACEHOLDER_RE = re.compile(r"\{step_(\d+)\}")
