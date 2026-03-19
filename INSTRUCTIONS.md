@@ -119,19 +119,6 @@ uv run wo-mcp-server
 | `LITELLM_API_KEY` | _(required)_ | LiteLLM proxy API key |
 | `LITELLM_BASE_URL` | _(required)_ | LiteLLM proxy base URL, e.g. `https://your-litellm-host.example.com` |
 
-**FMSR server**
-
-| Variable | Default | Description |
-|---|---|---|
-| `FMSR_MODEL_ID` | `watsonx/meta-llama/llama-3-3-70b-instruct` | LiteLLM model string used by the `fmsr` server for LLM-based failure mode queries |
-
-**TSFM server**
-
-| Variable | Default | Description |
-|---|---|---|
-| `PATH_TO_MODELS_DIR` | `src/servers/tsfm/artifacts/output/tuned_models` | Base directory for TTM model checkpoints |
-| `PATH_TO_DATASETS_DIR` | _(cwd)_ | Base directory for resolving relative dataset paths |
-| `PATH_TO_OUTPUTS_DIR` | _(cwd)_ | Base directory for resolving output/save paths |
 
 **General** — all servers
 
