@@ -123,7 +123,7 @@ uv run wo-mcp-server
 
 ## MCP Servers
 
-### iot
+### iot — IoT Sensor Data
 
 **Path:** `src/servers/iot/main.py`
 **Requires:** CouchDB (`COUCHDB_URL`, `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`, `IOT_DBNAME`)
@@ -135,7 +135,7 @@ uv run wo-mcp-server
 | `sensors` | `site_name`, `asset_id`                    | List sensor names for an asset                                          |
 | `history` | `site_name`, `asset_id`, `start`, `final?` | Fetch historical sensor readings for a time range (ISO 8601 timestamps) |
 
-### utilities
+### utilities — Utilities
 
 **Path:** `src/servers/utilities/main.py`
 **Requires:** nothing (no external services)
@@ -146,7 +146,7 @@ uv run wo-mcp-server
 | `current_date_time`    | —           | Return the current UTC date and time as JSON           |
 | `current_time_english` | —           | Return the current UTC time as a human-readable string |
 
-### fmsr
+### fmsr — Failure Mode and Sensor Reasoning
 
 **Path:** `src/servers/fmsr/main.py`
 **Requires:** `WATSONX_APIKEY`, `WATSONX_PROJECT_ID`, `WATSONX_URL` for unknown assets; curated lists for `chiller` and `ahu` work without credentials.
@@ -157,7 +157,7 @@ uv run wo-mcp-server
 | `get_failure_modes`               | `asset_name`                             | Return known failure modes for an asset. Uses a curated YAML list for chillers and AHUs; falls back to the LLM for other types.                         |
 | `get_failure_mode_sensor_mapping` | `asset_name`, `failure_modes`, `sensors` | For each (failure mode, sensor) pair, determine relevancy via LLM. Returns bidirectional `fm→sensors` and `sensor→fms` maps plus full per-pair details. |
 
-### wo
+### wo — Work Order
 
 **Path:** `src/servers/wo/main.py`
 **Requires:** CouchDB (`COUCHDB_URL`, `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`, `WO_DBNAME`)
@@ -174,7 +174,7 @@ uv run wo-mcp-server
 | `predict_next_work_order`     | `equipment_id`, `start_date?`, `end_date?`            | Predict next work order type via Markov transition matrix built from historical sequence |
 | `analyze_alert_to_failure`    | `equipment_id`, `rule_id`, `start_date?`, `end_date?` | Probability that an alert rule leads to a work order; average hours to maintenance       |
 
-### tsfm
+### tsfm — Time Series Foundation Model
 
 **Path:** `src/servers/tsfm/main.py`
 **Requires:** `tsfm_public` (IBM Granite TSFM), `transformers`, `torch` for ML tools — imported lazily; static tools work without them.
