@@ -146,7 +146,7 @@ uv run wo-mcp-server
 | `current_date_time`    | —           | Return the current UTC date and time as JSON           |
 | `current_time_english` | —           | Return the current UTC time as a human-readable string |
 
-### fmsr — Failure Mode and Sensor Reasoning
+### fmsr — Failure Mode and Sensor Relations
 
 **Path:** `src/servers/fmsr/main.py`
 **Requires:** `WATSONX_APIKEY`, `WATSONX_PROJECT_ID`, `WATSONX_URL` for unknown assets; curated lists for `chiller` and `ahu` work without credentials.
