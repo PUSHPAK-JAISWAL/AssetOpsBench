@@ -120,12 +120,6 @@ uv run wo-mcp-server
 | `LITELLM_BASE_URL` | _(required)_ | LiteLLM proxy base URL, e.g. `https://your-litellm-host.example.com` |
 
 
-**General** — all servers
-
-| Variable | Default | Description |
-|---|---|---|
-| `LOG_LEVEL` | `WARNING` | Log level for MCP servers (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
-
 ---
 
 ## MCP Servers
