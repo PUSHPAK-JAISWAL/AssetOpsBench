@@ -24,7 +24,7 @@ References
 
 Output
 ------
-bulk_docs_vibration.json — CouchDB bulk-insert document with fields:
+bulk_docs_vibration.json — JSON array of CouchDB documents with fields:
   asset_id, timestamp (ISO-8601 µs), Vibration_X (g)
 
 Usage
@@ -124,7 +124,7 @@ def main() -> None:
 
     out = os.path.join(os.path.dirname(__file__), "bulk_docs_vibration.json")
     with open(out, "w") as f:
-        json.dump({"docs": docs}, f, indent=2)
+        json.dump(docs, f, indent=2)
 
     print(f"Wrote {len(docs)} documents to {out}")
 
