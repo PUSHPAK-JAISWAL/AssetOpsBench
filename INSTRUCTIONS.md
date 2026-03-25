@@ -193,7 +193,7 @@ uv run wo-mcp-server
 ### vibration — Vibration Diagnostics
 
 **Path:** `src/servers/vibration/main.py`
-**Requires:** CouchDB (same env vars as iot: `COUCHDB_URL`, `COUCHDB_DBNAME`, `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`); `numpy`, `scipy`
+**Requires:** CouchDB (`COUCHDB_URL`, `VIBRATION_DBNAME` (default `vibration`), `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`); `numpy`, `scipy`
 **DSP core:** `src/servers/vibration/dsp/` — adapted from [vibration-analysis-mcp](https://github.com/LGDiMaggio/claude-stwinbox-diagnostics/tree/main/mcp-servers/vibration-analysis-mcp) (Apache-2.0)
 
 | Tool | Arguments | Description |

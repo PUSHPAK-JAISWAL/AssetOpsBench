@@ -1,4 +1,4 @@
-"""VibrationAgent MCP Server.
+"""vibration MCP Server.
 
 Vibration signal analysis and rotating machinery fault detection
 for AssetOpsBench.  Reads sensor data from CouchDB, performs FFT,
@@ -43,7 +43,7 @@ _log_level = getattr(
 logging.basicConfig(level=_log_level)
 logger = logging.getLogger("vibration-mcp-server")
 
-mcp = FastMCP("VibrationAgent")
+mcp = FastMCP("vibration")
 
 
 # ---------------------------------------------------------------------------

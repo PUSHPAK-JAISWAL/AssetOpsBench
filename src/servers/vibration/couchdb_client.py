@@ -1,7 +1,8 @@
 """CouchDB client for fetching vibration sensor data.
 
-Reuses the same environment variables as the IoT MCP server
-(COUCHDB_URL, COUCHDB_DBNAME, COUCHDB_USERNAME, COUCHDB_PASSWORD).
+Uses a dedicated database (VIBRATION_DBNAME, default 'vibration') to keep
+vibration data isolated from the IoT chiller database.  Connection
+credentials are shared: COUCHDB_URL, COUCHDB_USERNAME, COUCHDB_PASSWORD.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ load_dotenv()
 logger = logging.getLogger("vibration-mcp-server")
 
 COUCHDB_URL = os.environ.get("COUCHDB_URL")
-COUCHDB_DBNAME = os.environ.get("COUCHDB_DBNAME")
+VIBRATION_DBNAME = os.environ.get("VIBRATION_DBNAME", "vibration")
 COUCHDB_USER = os.environ.get("COUCHDB_USERNAME")
 COUCHDB_PASSWORD = os.environ.get("COUCHDB_PASSWORD")
 
@@ -29,9 +30,14 @@ def _get_db() -> Optional[couchdb3.Database]:
     if not COUCHDB_URL:
         logger.warning("COUCHDB_URL not set — vibration data from CouchDB unavailable")
         return None
+    if not VIBRATION_DBNAME:
+        logger.warning(
+            "VIBRATION_DBNAME not set — vibration data from CouchDB unavailable"
+        )
+        return None
     try:
         return couchdb3.Database(
-            COUCHDB_DBNAME,
+            VIBRATION_DBNAME,
             url=COUCHDB_URL,
             user=COUCHDB_USER,
             password=COUCHDB_PASSWORD,

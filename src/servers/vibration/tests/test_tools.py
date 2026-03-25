@@ -1,4 +1,4 @@
-"""Tests for VibrationAgent MCP server tools.
+"""Tests for vibration MCP server tools.
 
 Unit tests use synthetic signals; integration tests require a live CouchDB
 (skipped unless COUCHDB_URL is set).

@@ -34,14 +34,14 @@ COUCHDB_URL="http://localhost:5984" \
     --data-dir /sample_data/work_order \
     --db "${WO_DBNAME:-workorder}"
 
-# Load vibration sample data (Motor_01 bearing fault) into the IoT database
+# Load vibration sample data (Motor_01 bearing fault) into a dedicated database
 VIBRATION_FILE="/sample_data/bulk_docs_vibration.json"
 if [ -f "$VIBRATION_FILE" ]; then
   echo "Loading vibration data..."
   COUCHDB_URL="http://localhost:5984" \
     python3 /couchdb/init_asset_data.py \
       --data-file "$VIBRATION_FILE" \
-      --db "${IOT_DBNAME:-chiller}"
+      --db "${VIBRATION_DBNAME:-vibration}"
 else
   echo "⚠️ $VIBRATION_FILE not found, skipping vibration data."
 fi

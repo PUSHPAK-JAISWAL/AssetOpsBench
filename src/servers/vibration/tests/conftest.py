@@ -1,4 +1,4 @@
-"""Fixtures and helpers for VibrationAgent tests."""
+"""Fixtures and helpers for vibration server tests."""
 
 import json
 import os
