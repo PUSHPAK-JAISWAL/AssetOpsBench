@@ -89,6 +89,7 @@ uv run iot-mcp-server
 uv run fmsr-mcp-server
 uv run tsfm-mcp-server
 uv run wo-mcp-server
+uv run vibration-mcp-server
 ```
 
 ---
@@ -102,8 +103,9 @@ uv run wo-mcp-server
 | `COUCHDB_URL`      | `http://localhost:5984` | CouchDB connection URL   |
 | `COUCHDB_USERNAME` | `admin`                 | CouchDB admin username   |
 | `COUCHDB_PASSWORD` | `password`              | CouchDB admin password   |
-| `IOT_DBNAME`       | `chiller`               | IoT sensor database name |
-| `WO_DBNAME`        | `workorder`             | Work order database name |
+| `IOT_DBNAME`         | `chiller`               | IoT sensor database name      |
+| `WO_DBNAME`          | `workorder`             | Work order database name      |
+| `VIBRATION_DBNAME`   | `vibration`             | Vibration sensor database name |
 
 **WatsonX** — plan-execute runner (when `--model-id` starts with `watsonx/`)
 
@@ -162,7 +164,7 @@ uv run wo-mcp-server
 
 **Path:** `src/servers/wo/main.py`
 **Requires:** CouchDB (`COUCHDB_URL`, `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`, `WO_DBNAME`)
-**Data init:** Handled automatically by `docker compose -f src/couchdb/docker-compose.yaml up` (runs `src/couchdb/init_wo.py` inside the CouchDB container on first start)
+**Data init:** Handled automatically by `docker compose -f src/couchdb/docker-compose.yaml up` (runs `src/couchdb/init_wo.py` inside the CouchDB container on every start — database is dropped and reloaded each time)
 
 | Tool                          | Arguments                                             | Description                                                                              |
 | ----------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------- |
