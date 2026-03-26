@@ -13,6 +13,7 @@ This directory contains the MCP servers and infrastructure for the AssetOpsBench
   - [fmsr](#fmsr)
   - [tsfm](#tsfm)
   - [wo](#wo)
+  - [vibration](#vibration)
 - [Plan-Execute Runner](#plan-execute-runner)
   - [How it works](#how-it-works)
   - [CLI](#cli)
@@ -88,6 +89,7 @@ uv run iot-mcp-server
 uv run fmsr-mcp-server
 uv run tsfm-mcp-server
 uv run wo-mcp-server
+uv run vibration-mcp-server
 ```
 
 ---
@@ -101,8 +103,9 @@ uv run wo-mcp-server
 | `COUCHDB_URL`      | `http://localhost:5984` | CouchDB connection URL   |
 | `COUCHDB_USERNAME` | `admin`                 | CouchDB admin username   |
 | `COUCHDB_PASSWORD` | `password`              | CouchDB admin password   |
-| `IOT_DBNAME`       | `chiller`               | IoT sensor database name |
-| `WO_DBNAME`        | `workorder`             | Work order database name |
+| `IOT_DBNAME`         | `chiller`               | IoT sensor database name      |
+| `WO_DBNAME`          | `workorder`             | Work order database name      |
+| `VIBRATION_DBNAME`   | `vibration`             | Vibration sensor database name |
 
 **WatsonX** — plan-execute runner (when `--model-id` starts with `watsonx/`)
 
@@ -161,7 +164,7 @@ uv run wo-mcp-server
 
 **Path:** `src/servers/wo/main.py`
 **Requires:** CouchDB (`COUCHDB_URL`, `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`, `WO_DBNAME`)
-**Data init:** Handled automatically by `docker compose -f src/couchdb/docker-compose.yaml up` (runs `src/couchdb/init_wo.py` inside the CouchDB container on first start)
+**Data init:** Handled automatically by `docker compose -f src/couchdb/docker-compose.yaml up` (runs `src/couchdb/init_wo.py` inside the CouchDB container on every start — database is dropped and reloaded each time)
 
 | Tool                          | Arguments                                             | Description                                                                              |
 | ----------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------- |
@@ -188,6 +191,23 @@ uv run wo-mcp-server
 | `run_tsfm_finetuning`  | `dataset_path`, `timestamp_column`, `target_columns`, `model_checkpoint?`, `save_model_dir?`, `n_finetune?`, `n_test?`, ... | Few-shot fine-tune a TTM model; returns saved checkpoint path and metrics file                   |
 | `run_tsad`             | `dataset_path`, `tsfm_output_json`, `timestamp_column`, `target_columns`, `task?`, `false_alarm?`, `ad_model_type?`, ...    | Conformal anomaly detection on top of a forecasting output JSON; returns CSV with anomaly labels |
 | `run_integrated_tsad`  | `dataset_path`, `timestamp_column`, `target_columns`, `model_checkpoint?`, `false_alarm?`, `n_calibration?`, ...            | End-to-end forecasting + anomaly detection in one call; returns combined CSV                     |
+
+### vibration — Vibration Diagnostics
+
+**Path:** `src/servers/vibration/main.py`
+**Requires:** CouchDB (`COUCHDB_URL`, `VIBRATION_DBNAME` (default `vibration`), `COUCHDB_USERNAME`, `COUCHDB_PASSWORD`); `numpy`, `scipy`
+**DSP core:** `src/servers/vibration/dsp/` — adapted from [vibration-analysis-mcp](https://github.com/LGDiMaggio/claude-stwinbox-diagnostics/tree/main/mcp-servers/vibration-analysis-mcp) (Apache-2.0)
+
+| Tool | Arguments | Description |
+|---|---|---|
+| `get_vibration_data` | `site_name`, `asset_id`, `sensor_name`, `start`, `final?` | Fetch vibration time-series from CouchDB and load into the analysis store. Returns a `data_id`. |
+| `list_vibration_sensors` | `site_name`, `asset_id` | List available sensor fields for an asset. |
+| `compute_fft_spectrum` | `data_id`, `window?`, `top_n?` | Compute FFT amplitude spectrum (top-N peaks + statistics). |
+| `compute_envelope_spectrum` | `data_id`, `band_low_hz?`, `band_high_hz?`, `top_n?` | Compute envelope spectrum for bearing fault detection (Hilbert transform). |
+| `assess_vibration_severity` | `rms_velocity_mm_s`, `machine_group?` | Classify vibration severity per ISO 10816 (Zones A–D). |
+| `calculate_bearing_frequencies` | `rpm`, `n_balls`, `ball_diameter_mm`, `pitch_diameter_mm`, `contact_angle_deg?`, `bearing_name?` | Compute bearing characteristic frequencies (BPFO, BPFI, BSF, FTF). |
+| `list_known_bearings` | — | List all bearings in the built-in database. |
+| `diagnose_vibration` | `data_id`, `rpm?`, `bearing_designation?`, `bearing_*?`, `bpfo_hz?`, `bpfi_hz?`, `bsf_hz?`, `ftf_hz?`, `machine_group?`, `machine_description?` | Full automated diagnosis: FFT + shaft features + bearing envelope + ISO 10816 + fault classification + markdown report. |
 
 ---
 
@@ -258,7 +278,7 @@ uv run plan-execute --show-history --json "How many observations exist for CH-1?
 
 ### End-to-end examples
 
-All five servers (iot, utilities, fmsr, tsfm, wo) are registered by default.
+All six servers (iot, utilities, fmsr, tsfm, wo, vibration) are registered by default.
 
 #### Work order queries (requires CouchDB + populated `workorder` db)
 
@@ -359,6 +379,8 @@ runner = PlanExecuteRunner(
         "utilities": "utilities-mcp-server",
         "fmsr":      "fmsr-mcp-server",
         "tsfm":      "tsfm-mcp-server",
+        "wo":        "wo-mcp-server",
+        "vibration": "vibration-mcp-server",
     },
 )
 ```
@@ -398,6 +420,10 @@ Add the following to your Claude Desktop `claude_desktop_config.json`:
     "wo": {
       "command": "/path/to/uv",
       "args": ["run", "--project", "/path/to/AssetOpsBench", "wo-mcp-server"]
+    },
+    "vibration": {
+      "command": "/path/to/uv",
+      "args": ["run", "--project", "/path/to/AssetOpsBench", "vibration-mcp-server"]
     }
   }
 }
@@ -470,8 +496,8 @@ uv run pytest src/ -v
 │                   │ stdio      │                     │
 └───────────────────┼────────────┼─────────────────────┘
                     │ MCP protocol (stdio)
-         ┌──────────┼──────────┬──────────┬──────┐
-         ▼          ▼          ▼          ▼      ▼
-        iot     utilities    fmsr       tsfm    wo
-      (tools)    (tools)    (tools)   (tools) (tools)
+         ┌──────────┼──────────┬──────────┬──────┬───────────┐
+         ▼          ▼          ▼          ▼      ▼           ▼
+        iot     utilities    fmsr       tsfm    wo      vibration
+      (tools)    (tools)    (tools)   (tools) (tools)    (tools)
 ```
