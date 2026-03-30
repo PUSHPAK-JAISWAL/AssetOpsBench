@@ -182,11 +182,17 @@ class Executor:
 
 
 def _has_placeholders(args: dict) -> bool:
-    """Return True if any string arg value contains a {{step_N}} placeholder."""
-    return any(
-        isinstance(v, str) and _PLACEHOLDER_RE.search(v)
-        for v in args.values()
-    )
+    """Return True if any arg value (at any nesting depth) contains a {step_N} placeholder."""
+    def _check(val: Any) -> bool:
+        if isinstance(val, str):
+            return bool(_PLACEHOLDER_RE.search(val))
+        if isinstance(val, dict):
+            return any(_check(v) for v in val.values())
+        if isinstance(val, list):
+            return any(_check(v) for v in val)
+        return False
+
+    return any(_check(v) for v in args.values())
 
 
 async def _resolve_args_with_llm(
@@ -218,6 +224,13 @@ async def _resolve_args_with_llm(
         for val in unresolved.values()
         for m in _PLACEHOLDER_RE.finditer(val)
     }
+    missing = referenced - context.keys()
+    if missing:
+        _log.warning(
+            "Tool '%s': placeholder(s) reference step(s) %s that are not in context — "
+            "those steps may have failed or not yet run.",
+            tool, sorted(missing),
+        )
     context_text = "\n".join(
         f"Step {n}: {context[n].response}"
         for n in sorted(referenced)
@@ -233,10 +246,20 @@ async def _resolve_args_with_llm(
         context=context_text or "(none)",
         unresolved=unresolved_text,
     )
-    raw = llm.generate(prompt)
 
-    # Parse the LLM response as JSON
-    resolved_values = _parse_json(raw)
+    # Attempt LLM resolution with one retry on empty/unparseable response.
+    resolved_values: dict = {}
+    for attempt in range(2):
+        raw = llm.generate(prompt)
+        resolved_values = _parse_json(raw)
+        if resolved_values:
+            break
+        _log.warning(
+            "Tool '%s': LLM arg-resolution attempt %d returned no parseable JSON "
+            "(response: %r…)%s",
+            tool, attempt + 1, raw[:120],
+            " — retrying." if attempt == 0 else " — using empty dict.",
+        )
 
     return {**known, **resolved_values}
 
@@ -262,6 +285,7 @@ def _parse_json(raw: str) -> dict:
                 return result
         except json.JSONDecodeError:
             pass
+    _log.debug("_parse_json: could not extract a JSON object from: %r…", raw[:120])
     return {}
 
 
