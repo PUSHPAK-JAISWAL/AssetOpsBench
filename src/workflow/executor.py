@@ -42,7 +42,7 @@ DEFAULT_SERVER_PATHS: dict[str, Path | str] = {
 _PLACEHOLDER_RE = re.compile(r"\{step_(\d+)\}")
 
 _ARG_RESOLUTION_PROMPT = """\
-Extract concrete argument values for a tool call from prior step results.
+Fill in the {step_N} placeholders in the tool arguments below using the prior step results.
 
 Tool: {tool}
 Task: {task}
@@ -50,15 +50,14 @@ Task: {task}
 Prior step results:
 {context}
 
-Arguments to resolve (placeholder hints name the source step; path hints like [0] or .field \
-show which item/field to extract):
-{unresolved}
+Tool arguments (replace every {{step_N}} value with the concrete value from the results above):
+{args}
 
 YOUR RESPONSE MUST BE A SINGLE RAW JSON OBJECT AND NOTHING ELSE.
 Do not write any explanation, reasoning, or prose — output only the JSON object.
 If a value comes from a list, use the first relevant element.
 
-Example — if context has {{"assets": ["Chiller 6"]}} and asset_id is needed:
+Example — if args has {{"asset_id": "{{step_2}}"}} and step 2 returned {{"assets": ["Chiller 6"]}}:
 {{"asset_id": "Chiller 6"}}
 
 JSON:"""
@@ -213,67 +212,28 @@ async def _resolve_args_with_llm(
     context: dict[int, StepResult],
     llm: LLMBackend,
 ) -> dict:
-    """Use the LLM to resolve {{step_N}} placeholders from prior step results.
-
-    Args that have no placeholders are passed through unchanged.
-    Args with placeholders are resolved by an LLM call using the referenced
-    step results as context.
-
-    Returns the fully resolved args dict.
-    """
-    known: dict = {}
-    unresolved: dict = {}
-    for key, val in args.items():
-        if isinstance(val, str) and _PLACEHOLDER_RE.search(val):
-            unresolved[key] = val
-        else:
-            known[key] = val
-
-    # Collect the step results referenced by any placeholder
-    referenced = {
-        int(m.group(1))
-        for val in unresolved.values()
-        for m in _PLACEHOLDER_RE.finditer(val)
-    }
-    missing = referenced - context.keys()
-    if missing:
-        _log.warning(
-            "Tool '%s': placeholder(s) reference step(s) %s that are not in context — "
-            "those steps may have failed or not yet run.",
-            tool,
-            sorted(missing),
-        )
+    """Resolve {step_N} placeholders in args using prior step results via an LLM call."""
     context_text = "\n".join(
-        f"Step {n}: {context[n].response}" for n in sorted(referenced) if n in context
+        f"Step {n}: {r.response}" for n, r in sorted(context.items())
     )
-    unresolved_text = "\n".join(
-        f"  {k} (placeholder: {v})" for k, v in unresolved.items()
+    # Use plain string replacement instead of str.format() — context and args
+    # both contain JSON with {braces} that would break format().
+    prompt = (
+        _ARG_RESOLUTION_PROMPT
+        .replace("{task}", task)
+        .replace("{tool}", tool)
+        .replace("{context}", context_text or "(none)")
+        .replace("{args}", json.dumps(args))
+        .replace("{{", "{").replace("}}", "}")  # unescape template literals
     )
-
-    prompt = _ARG_RESOLUTION_PROMPT.format(
-        task=task,
-        tool=tool,
-        context=context_text or "(none)",
-        unresolved=unresolved_text,
-    )
-
-    # Attempt LLM resolution with one retry on empty/unparseable response.
-    resolved_values: dict = {}
-    for attempt in range(2):
-        raw = llm.generate(prompt)
-        resolved_values = _parse_json(raw)
-        if resolved_values:
-            break
+    raw = llm.generate(prompt)
+    resolved = _parse_json(raw)
+    if not resolved:
         _log.warning(
-            "Tool '%s': LLM arg-resolution attempt %d returned no parseable JSON "
-            "(response: %r…)%s",
-            tool,
-            attempt + 1,
-            raw[:120],
-            " — retrying." if attempt == 0 else " — using empty dict.",
+            "Tool '%s': arg resolution returned no parseable JSON (response: %r…)",
+            tool, raw[:120],
         )
-
-    return {**known, **resolved_values}
+    return {**args, **resolved}
 
 
 def _parse_json(raw: str) -> dict:
