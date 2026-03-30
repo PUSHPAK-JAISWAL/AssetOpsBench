@@ -136,13 +136,4 @@ class Planner:
         )
         prompt = _PLAN_PROMPT.format(servers=servers_text, question=question)
         raw = self._llm.generate(prompt)
-        plan = parse_plan(raw)
-
-        # Make sure the planner only uses servers that are actually available.
-        for step in plan.steps:
-            if step.server not in server_descriptions:
-                raise ValueError(
-                    f"Planner selected unknown server '{step.server}' at step {step.step_number}"
-                )
-
-        return plan
+        return parse_plan(raw)
