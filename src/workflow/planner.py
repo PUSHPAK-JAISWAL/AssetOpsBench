@@ -25,7 +25,7 @@ Available servers and tools:
 {servers}
 
 For argument values that can only be known from a prior step's result,
-use the placeholder {{step_N}} (e.g., {{step_1}}) as the value.
+use the placeholder {{step_N}} (e.g., {{step_1}}) as the ENTIRE value.
 
 Output format — one block per step, exactly:
 
@@ -46,7 +46,9 @@ Output format — one block per step, exactly:
 Rules:
 - Server and tool names must exactly match those listed above.
 - #Args must be a valid JSON object on a single line.
-- Use {{step_N}} as a placeholder when an argument depends on step N's result.
+- A placeholder {{step_N}} must be the ENTIRE string value — write "{{step_2}}",
+  never "{{step_2}}[0].id" or "{{step_2}}.field". The resolver extracts the right
+  field automatically from step N's full result.
 - Dependencies use #S<N> notation (e.g., #S1, #S2). Use "None" if none.
 - Keep tasks specific and actionable.
 
