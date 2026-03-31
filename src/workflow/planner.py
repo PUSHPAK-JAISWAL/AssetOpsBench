@@ -7,13 +7,10 @@ so the executor needs no additional LLM calls — it calls the tool directly.
 from __future__ import annotations
 
 import json
-import logging
 import re
 
 from llm import LLMBackend
 from .models import Plan, PlanStep
-
-_log = logging.getLogger(__name__)
 
 _PLAN_PROMPT = """\
 You are a planning assistant for industrial asset operations and maintenance.
@@ -25,7 +22,7 @@ Available servers and tools:
 {servers}
 
 For argument values that can only be known from a prior step's result,
-use the placeholder {{step_N}} (e.g., {{step_1}}) as the ENTIRE value.
+use the placeholder {{step_N}} (e.g., {{step_1}}) as the value.
 
 Output format — one block per step, exactly:
 
@@ -46,9 +43,7 @@ Output format — one block per step, exactly:
 Rules:
 - Server and tool names must exactly match those listed above.
 - #Args must be a valid JSON object on a single line.
-- A placeholder {{step_N}} must be the ENTIRE string value — write "{{step_2}}",
-  never "{{step_2}}[0].id" or "{{step_2}}.field". The resolver extracts the right
-  field automatically from step N's full result.
+- Use {{step_N}} as a placeholder when an argument depends on step N's result.
 - Dependencies use #S<N> notation (e.g., #S1, #S2). Use "None" if none.
 - Keep tasks specific and actionable.
 
@@ -80,10 +75,6 @@ def parse_plan(raw: str) -> Plan:
         try:
             args[n] = json.loads(m.group(2).strip())
         except json.JSONDecodeError:
-            _log.warning(
-                "Step %d: failed to parse #Args%d as JSON — falling back to {}: %r",
-                n, n, m.group(2).strip(),
-            )
             args[n] = {}
 
     steps = []

@@ -321,8 +321,8 @@ async def test_resolve_args_with_llm_fallback_on_bad_json(mock_llm):
     result = await _resolve_args_with_llm(
         "task", "tool", {"x": "{step_1}"}, ctx, llm
     )
-    # Bad JSON → resolved is empty → original args returned as fallback
-    assert result == {"x": "{step_1}"}
+    # Bad JSON → empty dict merged with known args (none here) → x absent
+    assert result == {}
 
 
 # ── _resolve_args tests (simple substitution, kept for reference) ─────────────
