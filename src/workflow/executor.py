@@ -42,25 +42,21 @@ DEFAULT_SERVER_PATHS: dict[str, Path | str] = {
 _PLACEHOLDER_RE = re.compile(r"\{step_(\d+)\}")
 
 _ARG_RESOLUTION_PROMPT = """\
-Fill in the {step_N} placeholders in the tool arguments below using the prior step results.
+You are resolving tool argument values for one step in a multi-step plan.
 
-Tool: {tool}
 Task: {task}
+Tool to call: {tool}
 
-Prior step results:
+Results from prior steps:
 {context}
 
-Tool arguments (replace every {{step_N}} value with the concrete value from the results above):
-{args}
+The following arguments need their values resolved from the context above:
+{unresolved}
 
-YOUR RESPONSE MUST BE A SINGLE RAW JSON OBJECT AND NOTHING ELSE.
-Do not write any explanation, reasoning, or prose — output only the JSON object.
-If a value comes from a list, use the first relevant element.
+Respond with a JSON object containing ONLY the resolved argument values.
+Example: {{"site_name": "MAIN", "asset_id": "CH-1"}}
 
-Example — if args has {{"asset_id": "{{step_2}}"}} and step 2 returned {{"assets": ["Chiller 6"]}}:
-{{"asset_id": "Chiller 6"}}
-
-JSON:"""
+Response:"""
 
 
 class Executor:
@@ -72,9 +68,7 @@ class Executor:
         server_paths: dict[str, Path | str] | None = None,
     ) -> None:
         self._llm = llm
-        self._server_paths = (
-            DEFAULT_SERVER_PATHS if server_paths is None else server_paths
-        )
+        self._server_paths = DEFAULT_SERVER_PATHS if server_paths is None else server_paths
 
     async def get_server_descriptions(self) -> dict[str, str]:
         """Query each registered MCP server and return formatted tool signatures."""
@@ -103,10 +97,7 @@ class Executor:
         for step in ordered:
             _log.info(
                 "Step %d/%d [%s]: %s",
-                step.step_number,
-                total,
-                step.server,
-                step.task,
+                step.step_number, total, step.server, step.task,
             )
             result = await self.execute_step(step, context, question)
             if result.success:
@@ -191,18 +182,11 @@ class Executor:
 
 
 def _has_placeholders(args: dict) -> bool:
-    """Return True if any arg value (at any nesting depth) contains a {step_N} placeholder."""
-
-    def _check(val: Any) -> bool:
-        if isinstance(val, str):
-            return bool(_PLACEHOLDER_RE.search(val))
-        if isinstance(val, dict):
-            return any(_check(v) for v in val.values())
-        if isinstance(val, list):
-            return any(_check(v) for v in val)
-        return False
-
-    return any(_check(v) for v in args.values())
+    """Return True if any string arg value contains a {{step_N}} placeholder."""
+    return any(
+        isinstance(v, str) and _PLACEHOLDER_RE.search(v)
+        for v in args.values()
+    )
 
 
 async def _resolve_args_with_llm(
@@ -212,28 +196,49 @@ async def _resolve_args_with_llm(
     context: dict[int, StepResult],
     llm: LLMBackend,
 ) -> dict:
-    """Resolve {step_N} placeholders in args using prior step results via an LLM call."""
+    """Use the LLM to resolve {{step_N}} placeholders from prior step results.
+
+    Args that have no placeholders are passed through unchanged.
+    Args with placeholders are resolved by an LLM call using the referenced
+    step results as context.
+
+    Returns the fully resolved args dict.
+    """
+    known: dict = {}
+    unresolved: dict = {}
+    for key, val in args.items():
+        if isinstance(val, str) and _PLACEHOLDER_RE.search(val):
+            unresolved[key] = val
+        else:
+            known[key] = val
+
+    # Collect the step results referenced by any placeholder
+    referenced = {
+        int(m.group(1))
+        for val in unresolved.values()
+        for m in _PLACEHOLDER_RE.finditer(val)
+    }
     context_text = "\n".join(
-        f"Step {n}: {r.response}" for n, r in sorted(context.items())
+        f"Step {n}: {context[n].response}"
+        for n in sorted(referenced)
+        if n in context
     )
-    # Use plain string replacement instead of str.format() — context and args
-    # both contain JSON with {braces} that would break format().
-    prompt = (
-        _ARG_RESOLUTION_PROMPT
-        .replace("{task}", task)
-        .replace("{tool}", tool)
-        .replace("{context}", context_text or "(none)")
-        .replace("{args}", json.dumps(args))
-        .replace("{{", "{").replace("}}", "}")  # unescape template literals
+    unresolved_text = "\n".join(
+        f"  {k} (placeholder: {v})" for k, v in unresolved.items()
+    )
+
+    prompt = _ARG_RESOLUTION_PROMPT.format(
+        task=task,
+        tool=tool,
+        context=context_text or "(none)",
+        unresolved=unresolved_text,
     )
     raw = llm.generate(prompt)
-    resolved = _parse_json(raw)
-    if not resolved:
-        _log.warning(
-            "Tool '%s': arg resolution returned no parseable JSON (response: %r…)",
-            tool, raw[:120],
-        )
-    return {**args, **resolved}
+
+    # Parse the LLM response as JSON
+    resolved_values = _parse_json(raw)
+
+    return {**known, **resolved_values}
 
 
 def _parse_json(raw: str) -> dict:
@@ -257,7 +262,6 @@ def _parse_json(raw: str) -> dict:
                 return result
         except json.JSONDecodeError:
             pass
-    _log.debug("_parse_json: could not extract a JSON object from: %r…", raw[:120])
     return {}
 
 
@@ -314,13 +318,11 @@ async def _list_tools(server_path: Path | str) -> list[dict]:
                     }
                     for k, v in props.items()
                 ]
-                tools.append(
-                    {
-                        "name": t.name,
-                        "description": t.description or "",
-                        "parameters": parameters,
-                    }
-                )
+                tools.append({
+                    "name": t.name,
+                    "description": t.description or "",
+                    "parameters": parameters,
+                })
             return tools
 
 
@@ -347,11 +349,9 @@ def _resolve_args(args: dict, context: dict[int, StepResult]) -> dict:
     resolved = {}
     for key, val in args.items():
         if isinstance(val, str):
-
             def _sub(m: re.Match) -> str:
                 n = int(m.group(1))
                 return context[n].response if n in context else m.group(0)
-
             resolved[key] = _PLACEHOLDER_RE.sub(_sub, val)
         else:
             resolved[key] = val
