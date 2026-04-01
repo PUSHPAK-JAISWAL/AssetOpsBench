@@ -220,16 +220,21 @@ async def _resolve_args_with_llm(
     )
     raw = llm.generate(prompt)
     resolved = _parse_json(raw)
-    if not resolved:
+    if resolved is None:
         _log.warning(
             "Tool '%s': arg resolution returned no parseable JSON (response: %r…)",
             tool, raw[:120],
         )
+        return {}
     return resolved
 
 
-def _parse_json(raw: str) -> dict:
-    """Extract a JSON object from an LLM response, with markdown fence handling."""
+def _parse_json(raw: str) -> dict | None:
+    """Extract a JSON object from an LLM response, with markdown fence handling.
+
+    Returns the parsed dict, or None if no JSON object could be extracted.
+    An empty dict ``{}`` is a valid successful parse (e.g. for no-arg tools).
+    """
     text = raw.strip()
     if text.startswith("```"):
         lines = text.splitlines()
@@ -250,7 +255,7 @@ def _parse_json(raw: str) -> dict:
         except json.JSONDecodeError:
             pass
     _log.debug("_parse_json: could not extract a JSON object from: %r…", raw[:120])
-    return {}
+    return None
 
 
 # ── MCP protocol helpers ──────────────────────────────────────────────────────

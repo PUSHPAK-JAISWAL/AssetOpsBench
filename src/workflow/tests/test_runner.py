@@ -491,8 +491,12 @@ def test_parse_json_embedded():
     assert _parse_json('Result: {"a": "b"} done.') == {"a": "b"}
 
 
-def test_parse_json_unrecoverable_returns_empty():
-    assert _parse_json("no json here") == {}
+def test_parse_json_unrecoverable_returns_none():
+    assert _parse_json("no json here") is None
+
+
+def test_parse_json_empty_object_returns_empty_dict():
+    assert _parse_json("{}") == {}
 
 
 # ── _parse_tool_call tests ────────────────────────────────────────────────────
