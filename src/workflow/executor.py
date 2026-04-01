@@ -1,14 +1,8 @@
 """MCP-based step executor for the plan-execute orchestrator.
 
-Each PlanStep contains the tool name and arguments decided by the planner.
-Argument values may contain {{step_N}} placeholders for values that can only
-be determined after a prior step runs.  When placeholders are detected the
-executor makes a targeted LLM call to resolve the concrete values from the
-prior step's result, then calls the tool.
-
-LLM call budget per question:
-  - Independent steps (no placeholders): 0 extra LLM calls — tool called directly.
-  - Dependent steps (has {{step_N}}):     1 LLM call to resolve args, then call tool.
+The planner produces steps with no pre-filled arguments. For every step that
+calls a tool the executor makes one LLM call to generate the concrete argument
+dict from the task description, original question, and prior step results.
 """
 
 from __future__ import annotations
@@ -42,23 +36,19 @@ DEFAULT_SERVER_PATHS: dict[str, Path | str] = {
 _PLACEHOLDER_RE = re.compile(r"\{step_(\d+)\}")
 
 _ARG_RESOLUTION_PROMPT = """\
-Fill in the {step_N} placeholders in the tool arguments below using the prior step results.
+Generate the JSON arguments for the tool call below.
 
+Question: {question}
 Tool: {tool}
 Task: {task}
 
 Prior step results:
 {context}
 
-Tool arguments (replace every {{step_N}} value with the concrete value from the results above):
-{args}
-
 YOUR RESPONSE MUST BE A SINGLE RAW JSON OBJECT AND NOTHING ELSE.
 Do not write any explanation, reasoning, or prose — output only the JSON object.
+Use the task description and prior step results to determine the correct argument values.
 If a value comes from a list, use the first relevant element.
-
-Example — if args has {{"asset_id": "{{step_2}}"}} and step 2 returned {{"assets": ["Chiller 6"]}}:
-{{"asset_id": "Chiller 6"}}
 
 JSON:"""
 
@@ -127,8 +117,7 @@ class Executor:
 
         1. Resolve the MCP server assigned to this step.
         2. If no tool is specified, return expected_output directly.
-        3. If tool_args contain {{step_N}} placeholders, call the LLM to resolve
-           them from prior step results.
+        3. Call the LLM to generate tool arguments from the task and prior results.
         4. Call the tool and return its result.
         """
         server_path = self._server_paths.get(step.server)
@@ -155,16 +144,10 @@ class Executor:
             )
 
         try:
-            if _has_placeholders(step.tool_args):
-                _log.info(
-                    "Step %d has unresolved args — calling LLM to resolve.",
-                    step.step_number,
-                )
-                resolved_args = await _resolve_args_with_llm(
-                    step.task, step.tool, step.tool_args, context, self._llm
-                )
-            else:
-                resolved_args = step.tool_args
+            _log.info("Step %d: calling LLM to resolve args.", step.step_number)
+            resolved_args = await _resolve_args_with_llm(
+                question, step.task, step.tool, context, self._llm
+            )
 
             response = await _call_tool(server_path, step.tool, resolved_args)
             return StepResult(
@@ -190,41 +173,23 @@ class Executor:
 # ── arg resolution ────────────────────────────────────────────────────────────
 
 
-def _has_placeholders(args: dict) -> bool:
-    """Return True if any arg value (at any nesting depth) contains a {step_N} placeholder."""
-
-    def _check(val: Any) -> bool:
-        if isinstance(val, str):
-            return bool(_PLACEHOLDER_RE.search(val))
-        if isinstance(val, dict):
-            return any(_check(v) for v in val.values())
-        if isinstance(val, list):
-            return any(_check(v) for v in val)
-        return False
-
-    return any(_check(v) for v in args.values())
-
-
 async def _resolve_args_with_llm(
+    question: str,
     task: str,
     tool: str,
-    args: dict,
     context: dict[int, StepResult],
     llm: LLMBackend,
 ) -> dict:
-    """Resolve {step_N} placeholders in args using prior step results via an LLM call."""
+    """Generate tool arguments from the task description and prior step results."""
     context_text = "\n".join(
         f"Step {n}: {r.response}" for n, r in sorted(context.items())
     )
-    # Use plain string replacement instead of str.format() — context and args
-    # both contain JSON with {braces} that would break format().
     prompt = (
         _ARG_RESOLUTION_PROMPT
+        .replace("{question}", question)
         .replace("{task}", task)
         .replace("{tool}", tool)
         .replace("{context}", context_text or "(none)")
-        .replace("{args}", json.dumps(args))
-        .replace("{{", "{").replace("}}", "}")  # unescape template literals
     )
     raw = llm.generate(prompt)
     resolved = _parse_json(raw)
@@ -233,7 +198,7 @@ async def _resolve_args_with_llm(
             "Tool '%s': arg resolution returned no parseable JSON (response: %r…)",
             tool, raw[:120],
         )
-    return {**args, **resolved}
+    return resolved
 
 
 def _parse_json(raw: str) -> dict:
