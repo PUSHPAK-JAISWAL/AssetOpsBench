@@ -40,6 +40,7 @@ Generate the JSON arguments for the tool call below.
 
 Question: {question}
 Tool: {tool}
+Tool parameters: {tool_schema}
 Task: {task}
 
 Prior step results:
@@ -47,6 +48,7 @@ Prior step results:
 
 YOUR RESPONSE MUST BE A SINGLE RAW JSON OBJECT AND NOTHING ELSE.
 Do not write any explanation, reasoning, or prose — output only the JSON object.
+Use EXACTLY the parameter names listed in "Tool parameters" above.
 Use the task description and prior step results to determine the correct argument values.
 If a value comes from a list, use the first relevant element.
 
@@ -88,6 +90,27 @@ class Executor:
         """Execute all plan steps in dependency order."""
         ordered = plan.resolved_order()
         total = len(ordered)
+
+        # Pre-fetch tool schemas for all servers referenced in the plan so that
+        # _resolve_args_with_llm can include exact parameter names in its prompt.
+        server_names = {step.server for step in ordered}
+        tool_schemas: dict[str, dict[str, str]] = {}  # server -> {tool_name -> sig}
+        for name in server_names:
+            path = self._server_paths.get(name)
+            if path is None:
+                continue
+            try:
+                tools = await _list_tools(path)
+                tool_schemas[name] = {
+                    t["name"]: ", ".join(
+                        f"{p['name']}: {p['type']}{'?' if not p['required'] else ''}"
+                        for p in t.get("parameters", [])
+                    )
+                    for t in tools
+                }
+            except Exception:  # noqa: BLE001
+                tool_schemas[name] = {}
+
         context: dict[int, StepResult] = {}
         results: list[StepResult] = []
         for step in ordered:
@@ -98,7 +121,8 @@ class Executor:
                 step.server,
                 step.task,
             )
-            result = await self.execute_step(step, context, question)
+            schema = tool_schemas.get(step.server, {}).get(step.tool, "")
+            result = await self.execute_step(step, context, question, tool_schema=schema)
             if result.success:
                 _log.info("Step %d OK.", step.step_number)
             else:
@@ -112,6 +136,7 @@ class Executor:
         step: PlanStep,
         context: dict[int, StepResult],
         question: str,
+        tool_schema: str = "",
     ) -> StepResult:
         """Execute a single plan step.
 
@@ -146,7 +171,7 @@ class Executor:
         try:
             _log.info("Step %d: calling LLM to resolve args.", step.step_number)
             resolved_args = await _resolve_args_with_llm(
-                question, step.task, step.tool, context, self._llm
+                question, step.task, step.tool, tool_schema, context, self._llm
             )
 
             response = await _call_tool(server_path, step.tool, resolved_args)
@@ -177,6 +202,7 @@ async def _resolve_args_with_llm(
     question: str,
     task: str,
     tool: str,
+    tool_schema: str,
     context: dict[int, StepResult],
     llm: LLMBackend,
 ) -> dict:
@@ -189,6 +215,7 @@ async def _resolve_args_with_llm(
         .replace("{question}", question)
         .replace("{task}", task)
         .replace("{tool}", tool)
+        .replace("{tool_schema}", tool_schema or "(unknown)")
         .replace("{context}", context_text or "(none)")
     )
     raw = llm.generate(prompt)

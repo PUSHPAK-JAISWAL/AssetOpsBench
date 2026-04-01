@@ -389,7 +389,7 @@ async def test_resolve_args_with_llm_uses_context(mock_llm):
     ctx = {1: StepResult(step_number=1, task="t", server="a",
                          response='{"assets": ["CH-1", "CH-2"]}')}
     result = await _resolve_args_with_llm(
-        "What sensors does CH-1 have?", "get sensors", "sensors", ctx, llm,
+        "What sensors does CH-1 have?", "get sensors", "sensors", "", ctx, llm,
     )
     assert result["asset_id"] == "CH-1"
 
@@ -398,7 +398,7 @@ async def test_resolve_args_with_llm_uses_context(mock_llm):
 async def test_resolve_args_with_llm_fallback_on_bad_json(mock_llm):
     llm = mock_llm("I cannot determine the value.")
     ctx = {1: StepResult(step_number=1, task="t", server="a", response="data")}
-    result = await _resolve_args_with_llm("task", "task", "tool", ctx, llm)
+    result = await _resolve_args_with_llm("task", "task", "tool", "", ctx, llm)
     assert result == {}
 
 
@@ -406,7 +406,7 @@ async def test_resolve_args_with_llm_fallback_on_bad_json(mock_llm):
 async def test_resolve_args_with_llm_question_in_prompt():
     llm = _CapturingLLM('{"site_name": "MAIN"}')
     await _resolve_args_with_llm(
-        "What sites exist?", "List sites", "sites", {}, llm  # type: ignore[arg-type]
+        "What sites exist?", "List sites", "sites", "", {}, llm  # type: ignore[arg-type]
     )
     assert "What sites exist?" in llm.prompts[0]
 
@@ -414,8 +414,26 @@ async def test_resolve_args_with_llm_question_in_prompt():
 @pytest.mark.anyio
 async def test_resolve_args_with_llm_tool_in_prompt():
     llm = _CapturingLLM('{}')
-    await _resolve_args_with_llm("Q", "List IoT sites", "sites", {}, llm)  # type: ignore[arg-type]
+    await _resolve_args_with_llm("Q", "List IoT sites", "sites", "", {}, llm)  # type: ignore[arg-type]
     assert "sites" in llm.prompts[0]
+
+
+@pytest.mark.anyio
+async def test_resolve_args_with_llm_schema_in_prompt():
+    """Tool parameter schema appears in the prompt so LLM uses correct names."""
+    llm = _CapturingLLM('{"site_name": "MAIN"}')
+    await _resolve_args_with_llm(  # type: ignore[arg-type]
+        "Q", "List assets", "assets", "site_name: string", {}, llm
+    )
+    assert "site_name: string" in llm.prompts[0]
+
+
+@pytest.mark.anyio
+async def test_resolve_args_with_llm_unknown_schema_shows_sentinel():
+    """Empty schema renders as '(unknown)' in the prompt."""
+    llm = _CapturingLLM('{}')
+    await _resolve_args_with_llm("Q", "task", "tool", "", {}, llm)  # type: ignore[arg-type]
+    assert "(unknown)" in llm.prompts[0]
 
 
 @pytest.mark.anyio
@@ -423,14 +441,14 @@ async def test_resolve_args_with_llm_context_in_prompt():
     """Prior step results appear verbatim in the generated prompt."""
     llm = _CapturingLLM('{}')
     ctx = {1: StepResult(step_number=1, task="t", server="a", response="step-one-result")}
-    await _resolve_args_with_llm("Q", "task", "tool", ctx, llm)  # type: ignore[arg-type]
+    await _resolve_args_with_llm("Q", "task", "tool", "", ctx, llm)  # type: ignore[arg-type]
     assert "step-one-result" in llm.prompts[0]
 
 
 @pytest.mark.anyio
 async def test_resolve_args_with_llm_empty_context_shows_none():
     llm = _CapturingLLM('{}')
-    await _resolve_args_with_llm("Q", "task", "tool", {}, llm)  # type: ignore[arg-type]
+    await _resolve_args_with_llm("Q", "task", "tool", "", {}, llm)  # type: ignore[arg-type]
     assert "(none)" in llm.prompts[0]
 
 
