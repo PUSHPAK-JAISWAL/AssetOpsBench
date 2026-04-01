@@ -60,7 +60,12 @@ def parse_plan(raw: str) -> Plan:
     """Parse an LLM-generated plan string into a Plan object."""
     tasks = {int(m.group(1)): m.group(2).strip() for m in _TASK_RE.finditer(raw)}
     servers = {int(m.group(1)): m.group(2).strip() for m in _SERVER_RE.finditer(raw)}
-    tools = {int(m.group(1)): m.group(2).strip() for m in _TOOL_RE.finditer(raw)}
+    # Strip any trailing signature the LLM may copy from the server description
+    # format "tool_name(param: type)" — only the bare name is needed.
+    tools = {
+        int(m.group(1)): m.group(2).strip().split("(")[0].strip()
+        for m in _TOOL_RE.finditer(raw)
+    }
     deps_raw = {int(m.group(1)): m.group(2).strip() for m in _DEP_RE.finditer(raw)}
     outputs = {int(m.group(1)): m.group(2).strip() for m in _OUTPUT_RE.finditer(raw)}
 
