@@ -13,6 +13,7 @@ an MCP-native implementation:
 from __future__ import annotations
 
 import logging
+from abc import ABC, abstractmethod
 from pathlib import Path
 
 from llm import LLMBackend
@@ -37,7 +38,23 @@ above. Do not repeat the individual steps — just give the final answer.
 """
 
 
-class PlanExecuteRunner:
+class AgentRunner(ABC):
+    """Abstract base class for all agent runners.
+
+    Subclasses implement :meth:`run` to handle a natural-language question and
+    return an :class:`OrchestratorResult`.  The ``llm`` attribute is available
+    to all subclasses.
+    """
+
+    def __init__(self, llm: LLMBackend) -> None:
+        self._llm = llm
+
+    @abstractmethod
+    async def run(self, question: str) -> OrchestratorResult:
+        """Run the agent on *question* and return a structured result."""
+
+
+class PlanExecuteRunner(AgentRunner):
     """Entry-point for plan-and-execute workflows using MCP servers as tool providers.
 
     Usage::
@@ -62,7 +79,7 @@ class PlanExecuteRunner:
         llm: LLMBackend,
         server_paths: dict[str, Path | str] | None = None,
     ) -> None:
-        self._llm = llm
+        super().__init__(llm)
         self._planner = Planner(llm)
         self._executor = Executor(llm, server_paths)
 
