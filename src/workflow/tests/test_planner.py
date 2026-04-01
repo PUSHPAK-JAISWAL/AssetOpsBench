@@ -62,6 +62,27 @@ class TestParsePlan:
         assert plan.steps[0].tool == "sites"
         assert plan.steps[1].tool == "assets"
 
+    def test_tool_name_signature_stripped(self):
+        """LLM sometimes copies the 'tool(params)' format from server descriptions.
+
+        parse_plan must strip the signature so the bare name reaches _call_tool.
+        """
+        raw = (
+            "#Task1: Get sites\n"
+            "#Server1: iot\n"
+            "#Tool1: sites()\n"
+            "#Dependency1: None\n"
+            "#ExpectedOutput1: Sites\n\n"
+            "#Task2: Get assets\n"
+            "#Server2: iot\n"
+            "#Tool2: assets(site_name: string)\n"
+            "#Dependency2: #S1\n"
+            "#ExpectedOutput2: Assets"
+        )
+        plan = parse_plan(raw)
+        assert plan.steps[0].tool == "sites"
+        assert plan.steps[1].tool == "assets"
+
     def test_tool_args_always_empty(self):
         """Planner no longer generates args — tool_args is always {}."""
         plan = parse_plan(_TWO_STEP)
