@@ -42,12 +42,17 @@ class AgentRunner(ABC):
     """Abstract base class for all agent runners.
 
     Subclasses implement :meth:`run` to handle a natural-language question and
-    return an :class:`OrchestratorResult`.  The ``llm`` attribute is available
-    to all subclasses.
+    return an :class:`OrchestratorResult`.  The ``llm`` and ``server_paths``
+    attributes are available to all subclasses.
     """
 
-    def __init__(self, llm: LLMBackend) -> None:
+    def __init__(
+        self,
+        llm: LLMBackend,
+        server_paths: dict[str, Path | str] | None = None,
+    ) -> None:
         self._llm = llm
+        self._server_paths = server_paths
 
     @abstractmethod
     async def run(self, question: str) -> OrchestratorResult:
@@ -79,7 +84,7 @@ class PlanExecuteRunner(AgentRunner):
         llm: LLMBackend,
         server_paths: dict[str, Path | str] | None = None,
     ) -> None:
-        super().__init__(llm)
+        super().__init__(llm, server_paths)
         self._planner = Planner(llm)
         self._executor = Executor(llm, server_paths)
 
