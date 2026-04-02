@@ -305,7 +305,7 @@ Run a question that exercises three servers with independent parallel steps:
 
 ```bash
 uv run plan-execute --show-plan --show-history \
-  "What is the current date and time? Also list assets at site MAIN. Also get failure modes for a chiller."
+  "What is the current date and time? Also list assets at site MAIN. Also get sensor list and failure mode list for any of the chiller at site MAIN."
 ```
 
 Expected plan (3 parallel steps, no dependencies):
